@@ -1,51 +1,39 @@
-var React = require('react');
-var ReactDOM = require('react-dom');
-var parseString = require('xml2js').parseString;
+'use strict'
 
-var XMLOutput = React.createClass({
-	render: function() {
-		var data = this.props.xmlContent;
-		var output = '';
+const electron = require('electron')
+const app = electron.app; // Module to control application life.
+const BrowserWindow = electron.BrowserWindow; // Module to create native browser window.
 
-		parseString(data, { trim: true, attrkey: '@' }, function (err, result) {
-			if (result) {
-				output = JSON.stringify(result, null, 2);
-			} else {
-				output = err.toString();
-			}
-		});
+// Keep a global reference of the window object, if you don't, the window will
+// be closed automatically when the JavaScript object is garbage collected.
+var mainWindow = null
 
-		return (
-			<div id="right-content">
-				<h2>Output JSON</h2>
-				<textarea id="output" value={output} disabled="true"></textarea>
-			</div>
-		);
-	}
-});
+// Quit when all windows are closed.
+app.on('window-all-closed', function () {
+  // On OS X it is common for applications and their menu bar
+  // to stay active until the user quits explicitly with Cmd + Q
+  if (process.platform != 'darwin') {
+    app.quit()
+  }
+})
 
-var XMLInput = React.createClass({
-	getInitialState: function getInitialState() {
-		return {
-			xmlContent: '<sampleXml><xmlSample>https://msdn.microsoft.com/en-us/library/ms762271(v=vs.85).aspx</xmlSample><ccdSample>https://raw.githubusercontent.com/chb/sample_ccdas/master/HL7%20Samples/CCD.sample.xml</ccdSample></sampleXml>'
-		};
-	},
-	onChange: function onChange(e) {
-		this.setState({
-			xmlContent: e.target.value
-		});
-	},
-	render: function() {
-		return (
-			<div>
-				<div id="left-content">
-					<h2>Input XML</h2>
-					<textarea onChange={this.onChange} value={this.state.xmlContent}></textarea>
-				</div>
-				<XMLOutput xmlContent={this.state.xmlContent} />
-			</div>
-		);
-	}
-});
+// This method will be called when Electron has finished
+// initialization and is ready to create browser windows.
+app.on('ready', function () {
+  // Create the browser window.
+  mainWindow = new BrowserWindow({width: 800, height: 600})
 
-ReactDOM.render(<XMLInput/>, document.getElementById('app'));
+  // and load the index.html of the app.
+  mainWindow.loadURL('file://' + __dirname + '/../../public/index.html')
+
+  // Open the DevTools.
+  // mainWindow.webContents.openDevTools()
+
+  // Emitted when the window is closed.
+  mainWindow.on('closed', function () {
+    // Dereference the window object, usually you would store windows
+    // in an array if your app supports multi windows, this is the time
+    // when you should delete the corresponding element.
+    mainWindow = null
+  })
+})

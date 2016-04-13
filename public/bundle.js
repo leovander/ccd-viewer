@@ -48,66 +48,83 @@
 
 	var React = __webpack_require__(1);
 	var ReactDOM = __webpack_require__(32);
-	var parseString = __webpack_require__(166).parseString;
-
-	var XMLOutput = React.createClass({
-		displayName: 'XMLOutput',
-
-		render: function render() {
-			var data = this.props.xmlContent;
-			var output = '';
-
-			parseString(data, { trim: true, attrkey: '@' }, function (err, result) {
-				if (result) {
-					output = JSON.stringify(result, null, 2);
-				} else {
-					output = err.toString();
-				}
-			});
-
-			return React.createElement(
-				'div',
-				{ id: 'right-content' },
-				React.createElement(
-					'h2',
-					null,
-					'Output JSON'
-				),
-				React.createElement('textarea', { id: 'output', value: output, disabled: 'true' })
-			);
-		}
-	});
+	var BlueButton = __webpack_require__(166);
+	var parseString = __webpack_require__(177).parseString;
 
 	var XMLInput = React.createClass({
-		displayName: 'XMLInput',
+	  displayName: 'XMLInput',
 
-		getInitialState: function getInitialState() {
-			return {
-				xmlContent: '<sampleXml><xmlSample>https://msdn.microsoft.com/en-us/library/ms762271(v=vs.85).aspx</xmlSample><ccdSample>https://raw.githubusercontent.com/chb/sample_ccdas/master/HL7%20Samples/CCD.sample.xml</ccdSample></sampleXml>'
-			};
-		},
-		onChange: function onChange(e) {
-			this.setState({
-				xmlContent: e.target.value
-			});
-		},
-		render: function render() {
-			return React.createElement(
-				'div',
-				null,
-				React.createElement(
-					'div',
-					{ id: 'left-content' },
-					React.createElement(
-						'h2',
-						null,
-						'Input XML'
-					),
-					React.createElement('textarea', { onChange: this.onChange, value: this.state.xmlContent })
-				),
-				React.createElement(XMLOutput, { xmlContent: this.state.xmlContent })
-			);
-		}
+	  getInitialState: function getInitialState() {
+	    return {
+	      xmlContent: '<hello><world>Hello</world></hello>'
+	    };
+	  },
+	  onChange: function onChange(e) {
+	    this.setState({
+	      xmlContent: e.target.value
+	    });
+	  },
+	  render: function render() {
+	    return React.createElement(
+	      'div',
+	      null,
+	      React.createElement(
+	        'div',
+	        { id: 'left-content' },
+	        React.createElement(
+	          'h2',
+	          null,
+	          'Input XML'
+	        ),
+	        React.createElement('textarea', { onChange: this.onChange, value: this.state.xmlContent })
+	      ),
+	      React.createElement(XMLOutput, { xmlContent: this.state.xmlContent })
+	    );
+	  }
+	});
+
+	var XMLOutput = React.createClass({
+	  displayName: 'XMLOutput',
+
+	  render: function render() {
+	    var data = this.props.xmlContent;
+	    var error = 'Invalid CCD/XML entered. Make sure that you are passing in valid XML.';
+	    var output = void 0;
+	    var validXML = false;
+
+	    if (data.length > 0 && data != null) {
+	      parseString(data, { trim: true }, function (err, result) {
+	        if (result) {
+	          validXML = true;
+	        } else {
+	          output = err.toString();
+	        }
+	      });
+
+	      if (validXML == true) {
+	        var ccda = BlueButton(data);
+
+	        if (typeof ccda.data !== 'undefined') {
+	          output = JSON.stringify(ccda.data, null, 2);
+	        } else {
+	          output = error;
+	        }
+	      }
+	    } else {
+	      output = error;
+	    }
+
+	    return React.createElement(
+	      'div',
+	      { id: 'right-content' },
+	      React.createElement(
+	        'h2',
+	        null,
+	        'Output JSON'
+	      ),
+	      React.createElement('textarea', { id: 'output', value: output, disabled: 'true' })
+	    );
+	  }
 	});
 
 	ReactDOM.render(React.createElement(XMLInput, null), document.getElementById('app'));
@@ -20071,6 +20088,6899 @@
 /* 166 */
 /***/ function(module, exports, __webpack_require__) {
 
+	(function(root, factory) {
+	    if(true) {
+	        module.exports = factory();
+	    }
+	    else if(typeof define === 'function' && define.amd) {
+	        define([], factory);
+	    }
+	    else {
+	        root['BlueButton'] = factory();
+	    }
+	}(this, function() {
+
+	/* BlueButton.js -- 0.4.2 */
+
+	/*
+	 * ...
+	 */
+
+	/* exported Core */
+	var Core = (function () {
+	  
+	  /*
+	   * ...
+	   */
+	  var parseData = function (source) {
+	    source = stripWhitespace(source);
+	    
+	    if (source.charAt(0) === '<') {
+	      try {
+	        return Core.XML.parse(source);
+	      } catch (e) {
+	        if (console.log) {
+	          console.log("File looked like it might be XML but couldn't be parsed.");
+	        }
+	      }
+	    }
+
+	    try {
+	      return JSON.parse(source);
+	    } catch (e) {
+	      if (console.error) {
+	        console.error("Error: Cannot parse this file. BB.js only accepts valid XML " +
+	          "(for parsing) or JSON (for generation). If you are attempting to provide " +
+	          "XML or JSON, please run your data through a validator to see if it is malformed.\n");
+	      }
+	      throw e;
+	    }
+	  };
+	  
+	  
+	  /*
+	   * Removes leading and trailing whitespace from a string
+	   */
+	  var stripWhitespace = function (str) {
+	    if (!str) { return str; }
+	    return str.replace(/^\s+|\s+$/g,'');
+	  };
+	  
+	  
+	  /*
+	   * A wrapper around JSON.stringify which allows us to produce customized JSON.
+	   *
+	   * See https://developer.mozilla.org/en-US/docs/Web/
+	   *        JavaScript/Guide/Using_native_JSON#The_replacer_parameter
+	   * for documentation on the replacerFn.
+	   */
+	  var json = function () {
+
+	    var datePad = function(number) {
+	      if (number < 10) {
+	        return '0' + number;
+	      }
+	      return number;
+	    };
+	    
+	    var replacerFn = function(key, value) {
+	      /* By default, Dates are output as ISO Strings like "2014-01-03T08:00:00.000Z." This is
+	       * tricky when all we have is a date (not a datetime); JS sadly ignores that distinction.
+	       *
+	       * To paper over this JS wart, we use two different JSON formats for dates and datetimes.
+	       * This is a little ugly but makes sure that the dates/datetimes mostly just parse
+	       * correclty for clients:
+	       *
+	       * 1. Datetimes are rendered as standard ISO strings, without the misleading millisecond
+	       *    precision (misleading because we don't have it): YYYY-MM-DDTHH:mm:ssZ
+	       * 2. Dates are rendered as MM/DD/YYYY. This ensures they are parsed as midnight local-time,
+	       *    no matter what local time is, and therefore ensures the date is always correct.
+	       *    Outputting "YYYY-MM-DD" would lead most browsers/node to assume midnight UTC, which
+	       *    means "2014-04-27" suddenly turns into "04/26/2014 at 5PM" or just "04/26/2014"
+	       *    if you format it as a date...
+	       *
+	       * See http://stackoverflow.com/questions/2587345/javascript-date-parse and
+	       *     http://blog.dygraphs.com/2012/03/javascript-and-dates-what-mess.html
+	       * for more on this issue.
+	       */
+	      var originalValue = this[key]; // a Date
+
+	      if ( value && (originalValue instanceof Date) && !isNaN(originalValue.getTime()) ) {
+
+	        // If while parsing we indicated that there was time-data specified, or if we see
+	        // non-zero values in the hour/minutes/seconds/millis fields, output a datetime.
+	        if (originalValue._parsedWithTimeData ||
+	            originalValue.getHours() || originalValue.getMinutes() ||
+	            originalValue.getSeconds() || originalValue.getMilliseconds()) {
+
+	          // Based on https://developer.mozilla.org/en-US/docs/Web/JavaScript/
+	          //    Reference/Global_Objects/Date/toISOString
+	          return originalValue.getUTCFullYear() +
+	            '-' + datePad( originalValue.getUTCMonth() + 1 ) +
+	            '-' + datePad( originalValue.getUTCDate() ) +
+	            'T' + datePad( originalValue.getUTCHours() ) +
+	            ':' + datePad( originalValue.getUTCMinutes() ) +
+	            ':' + datePad( originalValue.getUTCSeconds() ) +
+	            'Z';
+	        }
+	        
+	        // We just have a pure date
+	        return datePad( originalValue.getMonth() + 1 ) +
+	          '/' + datePad( originalValue.getDate() ) +
+	          '/' + originalValue.getFullYear();
+
+	      }
+
+	      return value;
+	    };
+	    
+	    return JSON.stringify(this, replacerFn, 2);
+	  };
+	  
+	  
+	  /*
+	   * Removes all `null` properties from an object.
+	   */
+	  var trim = function (o) {
+	    var y;
+	    for (var x in o) {
+	      if (o.hasOwnProperty(x)) {
+	        y = o[x];
+	        // if (y === null || (y instanceof Object && Object.keys(y).length == 0)) {
+	        if (y === null) {
+	          delete o[x];
+	        }
+	        if (y instanceof Object) y = trim(y);
+	      }
+	    }
+	    return o;
+	  };
+	  
+	  
+	  return {
+	    parseData: parseData,
+	    stripWhitespace: stripWhitespace,
+	    json: json,
+	    trim: trim
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * ...
+	 */
+
+	Core.Codes = (function () {
+	  
+	  /*
+	   * Administrative Gender (HL7 V3)
+	   * http://phinvads.cdc.gov/vads/ViewValueSet.action?id=8DE75E17-176B-DE11-9B52-0015173D1785
+	   * OID: 2.16.840.1.113883.1.11.1
+	   */
+	  var GENDER_MAP = {
+	    'F': 'female',
+	    'M': 'male',
+	    'UN': 'undifferentiated'
+	  };
+	  
+	  /*
+	   * Marital Status (HL7)
+	   * http://phinvads.cdc.gov/vads/ViewValueSet.action?id=46D34BBC-617F-DD11-B38D-00188B398520
+	   * OID: 2.16.840.1.114222.4.11.809
+	   */
+	  var MARITAL_STATUS_MAP = {
+	    'N': 'annulled',
+	    'C': 'common law',
+	    'D': 'divorced',
+	    'P': 'domestic partner',
+	    'I': 'interlocutory',
+	    'E': 'legally separated',
+	    'G': 'living together',
+	    'M': 'married',
+	    'O': 'other',
+	    'R': 'registered domestic partner',
+	    'A': 'separated',
+	    'S': 'single',
+	    'U': 'unknown',
+	    'B': 'unmarried',
+	    'T': 'unreported',
+	    'W': 'widowed'
+	  };
+
+	  /*
+	   * Religious Affiliation (HL7 V3)
+	   * https://phinvads.cdc.gov/vads/ViewValueSet.action?id=6BFDBFB5-A277-DE11-9B52-0015173D1785
+	   * OID: 2.16.840.1.113883.5.1076
+	   */
+	  var RELIGION_MAP = {
+	    "1001": "adventist",
+	    "1002": "african religions",
+	    "1003": "afro-caribbean religions",
+	    "1004": "agnosticism",
+	    "1005": "anglican",
+	    "1006": "animism",
+	    "1061": "assembly of god",
+	    "1007": "atheism",
+	    "1008": "babi & baha'i faiths",
+	    "1009": "baptist",
+	    "1010": "bon",
+	    "1062": "brethren",
+	    "1011": "cao dai",
+	    "1012": "celticism",
+	    "1013": "christian (non-catholic, non-specific)",
+	    "1063": "christian scientist",
+	    "1064": "church of christ",
+	    "1065": "church of god",
+	    "1014": "confucianism",
+	    "1066": "congregational",
+	    "1015": "cyberculture religions",
+	    "1067": "disciples of christ",
+	    "1016": "divination",
+	    "1068": "eastern orthodox",
+	    "1069": "episcopalian",
+	    "1070": "evangelical covenant",
+	    "1017": "fourth way",
+	    "1018": "free daism",
+	    "1071": "friends",
+	    "1072": "full gospel",
+	    "1019": "gnosis",
+	    "1020": "hinduism",
+	    "1021": "humanism",
+	    "1022": "independent",
+	    "1023": "islam",
+	    "1024": "jainism",
+	    "1025": "jehovah's witnesses",
+	    "1026": "judaism",
+	    "1027": "latter day saints",
+	    "1028": "lutheran",
+	    "1029": "mahayana",
+	    "1030": "meditation",
+	    "1031": "messianic judaism",
+	    "1073": "methodist",
+	    "1032": "mitraism",
+	    "1074": "native american",
+	    "1075": "nazarene",
+	    "1033": "new age",
+	    "1034": "non-roman catholic",
+	    "1035": "occult",
+	    "1036": "orthodox",
+	    "1037": "paganism",
+	    "1038": "pentecostal",
+	    "1076": "presbyterian",
+	    "1039": "process, the",
+	    "1077": "protestant",
+	    "1078": "protestant, no denomination",
+	    "1079": "reformed",
+	    "1040": "reformed/presbyterian",
+	    "1041": "roman catholic church",
+	    "1080": "salvation army",
+	    "1042": "satanism",
+	    "1043": "scientology",
+	    "1044": "shamanism",
+	    "1045": "shiite (islam)",
+	    "1046": "shinto",
+	    "1047": "sikism",
+	    "1048": "spiritualism",
+	    "1049": "sunni (islam)",
+	    "1050": "taoism",
+	    "1051": "theravada",
+	    "1081": "unitarian universalist",
+	    "1052": "unitarian-universalism",
+	    "1082": "united church of christ",
+	    "1053": "universal life church",
+	    "1054": "vajrayana (tibetan)",
+	    "1055": "veda",
+	    "1056": "voodoo",
+	    "1057": "wicca",
+	    "1058": "yaohushua",
+	    "1059": "zen buddhism",
+	    "1060": "zoroastrianism"
+	  };
+
+	  /*
+	   * Race & Ethnicity (HL7 V3)
+	   * Full list at http://phinvads.cdc.gov/vads/ViewCodeSystem.action?id=2.16.840.1.113883.6.238
+	   * OID: 2.16.840.1.113883.6.238
+	   *
+	   * Abbreviated list closer to real usage at: (Race / Ethnicity)
+	   * https://phinvads.cdc.gov/vads/ViewValueSet.action?id=67D34BBC-617F-DD11-B38D-00188B398520
+	   * https://phinvads.cdc.gov/vads/ViewValueSet.action?id=35D34BBC-617F-DD11-B38D-00188B398520
+	   */
+	  var RACE_ETHNICITY_MAP = {
+	    '2028-9': 'asian',
+	    '2054-5': 'black or african american',
+	    '2135-2': 'hispanic or latino',
+	    '2076-8': 'native',
+	    '2186-5': 'not hispanic or latino',
+	    '2131-1': 'other',
+	    '2106-3': 'white'
+	  };
+
+	  /*
+	   * Role (HL7 V3)
+	   * https://phinvads.cdc.gov/vads/ViewCodeSystem.action?id=2.16.840.1.113883.5.111
+	   * OID: 2.16.840.1.113883.5.111
+	   */
+	  var ROLE_MAP = {
+	    "ACC": "accident site",
+	    "ACHFID":  "accreditation location identifier",
+	    "ACTMIL":  "active duty military",
+	    "ALL": "allergy clinic",
+	    "AMB": "ambulance",
+	    "AMPUT":   "amputee clinic",
+	    "ANTIBIOT":    "antibiotic",
+	    "ASSIST":  "assistive non-person living subject",
+	    "AUNT":    "aunt",
+	    "B":   "blind",
+	    "BF":  "beef",
+	    "BILL":    "billing contact",
+	    "BIOTH":   "biotherapeutic non-person living subject",
+	    "BL":  "broiler",
+	    "BMTC":    "bone marrow transplant clinic",
+	    "BMTU":    "bone marrow transplant unit",
+	    "BR":  "breeder",
+	    "BREAST":  "breast clinic",
+	    "BRO": "brother",
+	    "BROINLAW":    "brother-in-law",
+	    "C":   "calibrator",
+	    "CANC": "child and adolescent neurology clinic",
+	    "CAPC": "child and adolescent psychiatry clinic",
+	    "CARD": "ambulatory health care facilities; clinic/center; rehabilitation: cardiac facilities",
+	    "CAS": "asylum seeker",
+	    "CASM":    "single minor asylum seeker",
+	    "CATH":    "cardiac catheterization lab",
+	    "CCO": "clinical companion",
+	    "CCU": "coronary care unit",
+	    "CHEST":   "chest unit",
+	    "CHILD":   "child",
+	    "CHLDADOPT":   "adopted child",
+	    "CHLDFOST":    "foster child",
+	    "CHLDINLAW":   "child in-law",
+	    "CHR": "chronic care facility",
+	    "CLAIM":   "claimant",
+	    "CN":  "national",
+	    "CNRP":    "non-country member without residence permit",
+	    "CNRPM":   "non-country member minor without residence permit",
+	    "CO":  "companion",
+	    "COAG":    "coagulation clinic",
+	    "COCBEN":  "continuity of coverage beneficiary",
+	    "COMM":    "community location",
+	    "COMMUNITYLABORATORY": "community laboratory",
+	    "COUSN":   "cousin",
+	    "CPCA":    "permit card applicant",
+	    "CRIMEVIC":    "crime victim",
+	    "CRP": "non-country member with residence permit",
+	    "CRPM":    "non-country member minor with residence permit",
+	    "CRS": "colon and rectal surgery clinic",
+	    "CSC": "community service center",
+	    "CVDX":    "cardiovascular diagnostics or therapeutics unit",
+	    "DA":  "dairy",
+	    "DADDR":   "delivery address",
+	    "DAU": "natural daughter",
+	    "DAUADOPT":    "adopted daughter",
+	    "DAUC":    "daughter",
+	    "DAUFOST": "foster daughter",
+	    "DAUINLAW":    "daughter in-law",
+	    "DC":  "therapeutic class",
+	    "DEBR":    "debridement",
+	    "DERM":    "dermatology clinic",
+	    "DIFFABL": "differently abled",
+	    "DOMPART": "domestic partner",
+	    "DPOWATT": "durable power of attorney",
+	    "DR":  "draft",
+	    "DU":  "dual",
+	    "DX":  "diagnostics or therapeutics unit",
+	    "E":   "electronic qc",
+	    "ECHO":    "echocardiography lab",
+	    "ECON":    "emergency contact",
+	    "ENDO":    "endocrinology clinic",
+	    "ENDOS":   "endoscopy lab",
+	    "ENROLBKR":    "enrollment broker",
+	    "ENT": "otorhinolaryngology clinic",
+	    "EPIL":    "epilepsy unit",
+	    "ER":  "emergency room",
+	    "ERL": "enrollment",
+	    "ETU": "emergency trauma unit",
+	    "EXCEST":  "executor of estate",
+	    "EXT": "extended family member",
+	    "F":   "filler proficiency",
+	    "FAMDEP":  "family dependent",
+	    "FAMMEMB": "family member",
+	    "FI":  "fiber",
+	    "FMC": "family medicine clinic",
+	    "FRND":    "unrelated friend",
+	    "FSTUD":   "full-time student",
+	    "FTH": "father",
+	    "FTHINLAW":    "father-in-law",
+	    "FULLINS": "fully insured coverage sponsor",
+	    "G":   "group",
+	    "GACH":    "hospitals; general acute care hospital",
+	    "GD":  "generic drug",
+	    "GDF": "generic drug form",
+	    "GDS": "generic drug strength",
+	    "GDSF":    "generic drug strength form",
+	    "GGRFTH":  "great grandfather",
+	    "GGRMTH":  "great grandmother",
+	    "GGRPRN":  "great grandparent",
+	    "GI":  "gastroenterology clinic",
+	    "GIDX":    "gastroenterology diagnostics or therapeutics lab",
+	    "GIM": "general internal medicine clinic",
+	    "GRFTH":   "grandfather",
+	    "GRMTH":   "grandmother",
+	    "GRNDCHILD":   "grandchild",
+	    "GRNDDAU": "granddaughter",
+	    "GRNDSON": "grandson",
+	    "GRPRN":   "grandparent",
+	    "GT":  "guarantor",
+	    "GUADLTM": "guardian ad lidem",
+	    "GUARD":   "guardian",
+	    "GYN": "gynecology clinic",
+	    "HAND":    "hand clinic",
+	    "HANDIC":  "handicapped dependent",
+	    "HBRO":    "half-brother",
+	    "HD":  "hemodialysis unit",
+	    "HEM": "hematology clinic",
+	    "HLAB":    "hospital laboratory",
+	    "HOMEHEALTH":  "home health",
+	    "HOSP":    "hospital",
+	    "HPOWATT": "healthcare power of attorney",
+	    "HRAD":    "radiology unit",
+	    "HSIB":    "half-sibling",
+	    "HSIS":    "half-sister",
+	    "HTN": "hypertension clinic",
+	    "HU":  "hospital unit",
+	    "HUSB":    "husband",
+	    "HUSCS":   "specimen collection site",
+	    "ICU": "intensive care unit",
+	    "IEC": "impairment evaluation center",
+	    "INDIG":   "member of an indigenous people",
+	    "INFD":    "infectious disease clinic",
+	    "INJ": "injured plaintiff",
+	    "INJWKR":  "injured worker",
+	    "INLAB":   "inpatient laboratory",
+	    "INPHARM": "inpatient pharmacy",
+	    "INV": "infertility clinic",
+	    "JURID":   "jurisdiction location identifier",
+	    "L":   "pool",
+	    "LABORATORY":  "laboratory",
+	    "LOCHFID": "local location identifier",
+	    "LY":  "layer",
+	    "LYMPH":   "lympedema clinic",
+	    "MAUNT":   "maternalaunt",
+	    "MBL": "medical laboratory",
+	    "MCOUSN":  "maternalcousin",
+	    "MGDSF":   "manufactured drug strength form",
+	    "MGEN":    "medical genetics clinic",
+	    "MGGRFTH": "maternalgreatgrandfather",
+	    "MGGRMTH": "maternalgreatgrandmother",
+	    "MGGRPRN": "maternalgreatgrandparent",
+	    "MGRFTH":  "maternalgrandfather",
+	    "MGRMTH":  "maternalgrandmother",
+	    "MGRPRN":  "maternalgrandparent",
+	    "MHSP":    "military hospital",
+	    "MIL": "military",
+	    "MOBL":    "mobile unit",
+	    "MT":  "meat",
+	    "MTH": "mother",
+	    "MTHINLAW":    "mother-in-law",
+	    "MU":  "multiplier",
+	    "MUNCLE":  "maternaluncle",
+	    "NBOR":    "neighbor",
+	    "NBRO":    "natural brother",
+	    "NCCF":    "nursing or custodial care facility",
+	    "NCCS":    "neurology critical care and stroke unit",
+	    "NCHILD":  "natural child",
+	    "NEPH":    "nephrology clinic",
+	    "NEPHEW":  "nephew",
+	    "NEUR":    "neurology clinic",
+	    "NFTH":    "natural father",
+	    "NFTHF":   "natural father of fetus",
+	    "NIECE":   "niece",
+	    "NIENEPH": "niece/nephew",
+	    "NMTH":    "natural mother",
+	    "NOK": "next of kin",
+	    "NPRN":    "natural parent",
+	    "NS":  "neurosurgery unit",
+	    "NSIB":    "natural sibling",
+	    "NSIS":    "natural sister",
+	    "O":   "operator proficiency",
+	    "OB":  "obstetrics clinic",
+	    "OF":  "outpatient facility",
+	    "OMS": "oral and maxillofacial surgery clinic",
+	    "ONCL":    "medical oncology clinic",
+	    "OPH": "opthalmology clinic",
+	    "OPTC":    "optometry clinic",
+	    "ORG": "organizational contact",
+	    "ORTHO":   "orthopedics clinic",
+	    "OUTLAB":  "outpatient laboratory",
+	    "OUTPHARM":    "outpatient pharmacy",
+	    "P":   "patient",
+	    "PAINCL":  "pain clinic",
+	    "PATHOLOGIST": "pathologist",
+	    "PAUNT":   "paternalaunt",
+	    "PAYOR":   "payor contact",
+	    "PC":  "primary care clinic",
+	    "PCOUSN":  "paternalcousin",
+	    "PEDC":    "pediatrics clinic",
+	    "PEDCARD": "pediatric cardiology clinic",
+	    "PEDE":    "pediatric endocrinology clinic",
+	    "PEDGI":   "pediatric gastroenterology clinic",
+	    "PEDHEM":  "pediatric hematology clinic",
+	    "PEDHO":   "pediatric oncology clinic",
+	    "PEDICU":  "pediatric intensive care unit",
+	    "PEDID":   "pediatric infectious disease clinic",
+	    "PEDNEPH": "pediatric nephrology clinic",
+	    "PEDNICU": "pediatric neonatal intensive care unit",
+	    "PEDRHEUM":    "pediatric rheumatology clinic",
+	    "PEDU":    "pediatric unit",
+	    "PGGRFTH": "paternalgreatgrandfather",
+	    "PGGRMTH": "paternalgreatgrandmother",
+	    "PGGRPRN": "paternalgreatgrandparent",
+	    "PGRFTH":  "paternalgrandfather",
+	    "PGRMTH":  "paternalgrandmother",
+	    "PGRPRN":  "paternalgrandparent",
+	    "PH":  "policy holder",
+	    "PHARM":   "pharmacy",
+	    "PHLEBOTOMIST":    "phlebotomist",
+	    "PHU": "psychiatric hospital unit",
+	    "PL":  "pleasure",
+	    "PLS": "plastic surgery clinic",
+	    "POD": "podiatry clinic",
+	    "POWATT":  "power of attorney",
+	    "PRC": "pain rehabilitation center",
+	    "PREV":    "preventive medicine clinic",
+	    "PRN": "parent",
+	    "PRNINLAW":    "parent in-law",
+	    "PROCTO":  "proctology clinic",
+	    "PROFF":   "provider's office",
+	    "PROG":    "program eligible",
+	    "PROS":    "prosthodontics clinic",
+	    "PSI": "psychology clinic",
+	    "PSTUD":   "part-time student",
+	    "PSY": "psychiatry clinic",
+	    "PSYCHF":  "psychiatric care facility",
+	    "PT":  "patient",
+	    "PTRES":   "patient's residence",
+	    "PUNCLE":  "paternaluncle",
+	    "Q":   "quality control",
+	    "R":   "replicate",
+	    "RADDX":   "radiology diagnostics or therapeutics unit",
+	    "RADO":    "radiation oncology unit",
+	    "RC":  "racing",
+	    "RESPRSN": "responsible party",
+	    "RETIREE": "retiree",
+	    "RETMIL":  "retired military",
+	    "RH":  "rehabilitation hospital",
+	    "RHAT":    "addiction treatment center",
+	    "RHEUM":   "rheumatology clinic",
+	    "RHII":    "intellectual impairment center",
+	    "RHMAD":   "parents with adjustment difficulties center",
+	    "RHPI":    "physical impairment center",
+	    "RHPIH":   "physical impairment - hearing center",
+	    "RHPIMS":  "physical impairment - motor skills center",
+	    "RHPIVS":  "physical impairment - visual skills center",
+	    "RHU": "rehabilitation hospital unit",
+	    "RHYAD":   "youths with adjustment difficulties center",
+	    "RNEU":    "neuroradiology unit",
+	    "ROOM":    "roommate",
+	    "RTF": "residential treatment facility",
+	    "SCHOOL":  "school",
+	    "SCN": "screening",
+	    "SEE": "seeing",
+	    "SELF":    "self",
+	    "SELFINS": "self insured coverage sponsor",
+	    "SH":  "show",
+	    "SIB": "sibling",
+	    "SIBINLAW":    "sibling in-law",
+	    "SIGOTHR": "significant other",
+	    "SIS": "sister",
+	    "SISINLAW":    "sister-in-law",
+	    "SLEEP":   "sleep disorders unit",
+	    "SNF": "skilled nursing facility",
+	    "SNIFF":   "sniffing",
+	    "SON": "natural son",
+	    "SONADOPT":    "adopted son",
+	    "SONC":    "son",
+	    "SONFOST": "foster son",
+	    "SONINLAW":    "son in-law",
+	    "SPMED":   "sports medicine clinic",
+	    "SPON":    "sponsored dependent",
+	    "SPOWATT": "special power of attorney",
+	    "SPS": "spouse",
+	    "STPBRO":  "stepbrother",
+	    "STPCHLD": "step child",
+	    "STPDAU":  "stepdaughter",
+	    "STPFTH":  "stepfather",
+	    "STPMTH":  "stepmother",
+	    "STPPRN":  "step parent",
+	    "STPSIB":  "step sibling",
+	    "STPSIS":  "stepsister",
+	    "STPSON":  "stepson",
+	    "STUD":    "student",
+	    "SU":  "surgery clinic",
+	    "SUBJECT": "self",
+	    "SURF":    "substance use rehabilitation facility",
+	    "THIRDPARTY":  "third party",
+	    "TPA": "third party administrator",
+	    "TR":  "transplant clinic",
+	    "TRAVEL":  "travel and geographic medicine clinic",
+	    "TRB": "tribal member",
+	    "UMO": "utilization management organization",
+	    "UNCLE":   "uncle",
+	    "UPC": "underage protection center",
+	    "URO": "urology clinic",
+	    "V":   "verifying",
+	    "VET": "veteran",
+	    "VL":  "veal",
+	    "WARD":    "ward",
+	    "WIFE":    "wife",
+	    "WL":  "wool",
+	    "WND": "wound clinic",
+	    "WO":  "working",
+	    "WORK":    "work site",
+	  };
+
+	  var PROBLEM_STATUS_MAP = {
+	    "55561003": "active",
+	    "73425007": "inactive",
+	    "413322009": "resolved"
+	  };
+
+
+	  // copied from _.invert to avoid making browser users include all of underscore
+	  var invertKeys = function(obj) {
+	    var result = {};
+	    var keys = Object.keys(obj);
+	    for (var i = 0, length = keys.length; i < length; i++) {
+	      result[obj[keys[i]]] = keys[i];
+	    }
+	    return result;
+	  };
+
+	  var lookupFnGenerator = function(map) {
+	    return function(key) {
+	      return map[key] || null;
+	    };
+	  };
+	  var reverseLookupFnGenerator = function(map) {
+	    return function(key) {
+	      if (!key) { return null; }
+	      var invertedMap = invertKeys(map);
+	      key = key.toLowerCase();
+	      return invertedMap[key] || null;
+	    };
+	  };
+	  
+	  
+	  return {
+	    gender: lookupFnGenerator(GENDER_MAP),
+	    reverseGender: reverseLookupFnGenerator(GENDER_MAP),
+	    maritalStatus: lookupFnGenerator(MARITAL_STATUS_MAP),
+	    reverseMaritalStatus: reverseLookupFnGenerator(MARITAL_STATUS_MAP),
+	    religion: lookupFnGenerator(RELIGION_MAP),
+	    reverseReligion: reverseLookupFnGenerator(RELIGION_MAP),
+	    raceEthnicity: lookupFnGenerator(RACE_ETHNICITY_MAP),
+	    reverseRaceEthnicity: reverseLookupFnGenerator(RACE_ETHNICITY_MAP),
+	    role: lookupFnGenerator(ROLE_MAP),
+	    reverseRole: reverseLookupFnGenerator(ROLE_MAP),
+	    problemStatus: lookupFnGenerator(PROBLEM_STATUS_MAP),
+	    reverseProblemStatus: reverseLookupFnGenerator(PROBLEM_STATUS_MAP)
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * ...
+	 */
+
+	Core.XML = (function () {
+	  
+	  /*
+	   * A function used to wrap DOM elements in an object so methods can be added
+	   * to the element object. IE8 does not allow methods to be added directly to
+	   * DOM objects.
+	   */
+	  var wrapElement = function (el) {
+	    function wrapElementHelper(currentEl) {
+	      return {
+	        el: currentEl,
+	        template: template,
+	        content: content,
+	        tag: tag,
+	        immediateChildTag: immediateChildTag,
+	        elsByTag: elsByTag,
+	        attr: attr,
+	        boolAttr: boolAttr,
+	        val: val,
+	        isEmpty: isEmpty
+	      };
+	    }
+	    
+	    // el is an array of elements
+	    if (el.length) {
+	      var els = [];
+	      for (var i = 0; i < el.length; i++) {
+	        els.push(wrapElementHelper(el[i]));
+	      }
+	      return els;
+	    
+	    // el is a single element
+	    } else {
+	      return wrapElementHelper(el);
+	    }
+	  };
+	  
+	  
+	  /*
+	   * Find element by tag name, then attribute value.
+	   */
+	  var tagAttrVal = function (el, tag, attr, value) {
+	    el = el.getElementsByTagName(tag);
+	    for (var i = 0; i < el.length; i++) {
+	      if (el[i].getAttribute(attr) === value) {
+	        return el[i];
+	      }
+	    }
+	  };
+	  
+	  
+	  /*
+	   * Search for a template ID, and return its parent element.
+	   * Example:
+	   *   <templateId root="2.16.840.1.113883.10.20.22.2.17"/>
+	   * Can be found using:
+	   *   el = dom.template('2.16.840.1.113883.10.20.22.2.17');
+	   */
+	  var template = function (templateId) {
+	    var el = tagAttrVal(this.el, 'templateId', 'root', templateId);
+	    if (!el) {
+	      return emptyEl();
+	    } else {
+	      return wrapElement(el.parentNode);
+	    }
+	  };
+
+	  /*
+	   * Search for a content tag by "ID", and return it as an element.
+	   * These are used in the unstructured versions of each section but
+	   * referenced from the structured version sometimes.
+	   * Example:
+	   *   <content ID="UniqueNameReferencedElsewhere"/>
+	   * Can be found using:
+	   *   el = dom.content('UniqueNameReferencedElsewhere');
+	   *
+	   * We can't use `getElementById` because `ID` (the standard attribute name
+	   * in this context) is not the same attribute as `id` in XML, so there are no matches
+	   */
+	  var content = function (contentId) {
+	      var el = tagAttrVal(this.el, 'content', 'ID', contentId);
+	      if (!el) {
+	        // check the <td> tag too, which isn't really correct but
+	        // will inevitably be used sometimes because it looks like very
+	        // normal HTML to put the data directly in a <td>
+	        el = tagAttrVal(this.el, 'td', 'ID', contentId);
+	      }
+	      if (!el) {
+	        // Ugh, Epic uses really non-standard locations.
+	        el = tagAttrVal(this.el, 'caption', 'ID', contentId) ||
+	             tagAttrVal(this.el, 'paragraph', 'ID', contentId) ||
+	             tagAttrVal(this.el, 'tr', 'ID', contentId) ||
+	             tagAttrVal(this.el, 'item', 'ID', contentId);
+	      }
+
+	      if (!el) {
+	        return emptyEl();
+	      } else {
+	        return wrapElement(el);
+	      }
+	    };
+	  
+	  
+	  /*
+	   * Search for the first occurrence of an element by tag name.
+	   */
+	  var tag = function (tag) {
+	    var el = this.el.getElementsByTagName(tag)[0];
+	    if (!el) {
+	      return emptyEl();
+	    } else {
+	      return wrapElement(el);
+	    }
+	  };
+
+	  /*
+	   * Like `tag`, except it will only count a tag that is an immediate child of `this`.
+	   * This is useful for tags like "text" which A. may not be present for a given location
+	   * in every document and B. have a very different meaning depending on their positioning
+	   *
+	   *   <parent>
+	   *     <target></target>
+	   *   </parent>
+	   * vs.
+	   *   <parent>
+	   *     <intermediate>
+	   *       <target></target>
+	   *     </intermediate>
+	   *   </parent>
+	   * parent.immediateChildTag('target') will have a result in the first case but not in the second.
+	   */
+	  var immediateChildTag = function (tag) {
+	    var els = this.el.getElementsByTagName(tag);
+	    if (!els) { return null; }
+	    for (var i = 0; i < els.length; i++) {
+	      if (els[i].parentNode === this.el) {
+	        return wrapElement(els[i]);
+	      }
+	    }
+	    return emptyEl();
+	  };
+	  
+	  
+	  /*
+	   * Search for all elements by tag name.
+	   */
+	  var elsByTag = function (tag) {
+	    return wrapElement(this.el.getElementsByTagName(tag));
+	  };
+
+
+	  var unescapeSpecialChars = function(s) {
+	    if (!s) { return s; }
+	    return s.replace(/&lt;/g, '<')
+	            .replace(/&gt;/g, '>')
+	            .replace(/&amp;/g, '&')
+	            .replace(/&quot;/g, '"')
+	            .replace(/&apos;/g, "'");
+	  };
+	  
+	  
+	  /*
+	   * Retrieve the element's attribute value. Example:
+	   *   value = el.attr('displayName');
+	   *
+	   * The browser and jsdom return "null" for empty attributes;
+	   * xmldom (which we now use because it's faster / can be explicitly
+	   * told to parse malformed XML as XML anyways), return the empty
+	   * string instead, so we fix that here.
+	   */
+	  var attr = function (attrName) {
+	    if (!this.el) { return null; }
+	    var attrVal = this.el.getAttribute(attrName);
+	    if (attrVal) {
+	      return unescapeSpecialChars(attrVal);
+	    }
+	    return null;
+	  };
+
+	  /*
+	   * Wrapper for attr() for retrieving boolean attributes;
+	   * a raw call attr() will return Strings, which can be unexpected,
+	   * since the string 'false' will by truthy
+	   */
+	  var boolAttr = function (attrName) {
+	    var rawAttr = this.attr(attrName);
+	    if (rawAttr === 'true' || rawAttr === '1') {
+	      return true;
+	    }
+	    return false;
+	  };
+
+	  
+	  /*
+	   * Retrieve the element's value. For example, if the element is:
+	   *   <city>Madison</city>
+	   * Use:
+	   *   value = el.tag('city').val();
+	   *
+	   * This function also knows how to retrieve the value of <reference> tags,
+	   * which can store their content in a <content> tag in a totally different
+	   * part of the document.
+	   */
+	  var val = function () {
+	    if (!this.el) { return null; }
+	    if (!this.el.childNodes || !this.el.childNodes.length) { return null; }
+	    var textContent = this.el.textContent;
+
+	    // if there's no text value here and the only thing inside is a
+	    // <reference> tag, see if there's a linked <content> tag we can
+	    // get something out of
+	    if (!Core.stripWhitespace(textContent)) {
+
+	      var contentId;
+	      // "no text value" might mean there's just a reference tag
+	      if (this.el.childNodes.length === 1 &&
+	          this.el.childNodes[0].tagName === 'reference') {
+	        contentId = this.el.childNodes[0].getAttribute('value');
+
+	      // or maybe a newlines on top/above the reference tag
+	      } else if (this.el.childNodes.length === 3 &&
+	          this.el.childNodes[1].tagName === 'reference') {
+	        contentId = this.el.childNodes[1].getAttribute('value');
+
+	      } else {
+	        return unescapeSpecialChars(textContent);
+	      }
+
+	      if (contentId && contentId[0] === '#') {
+	        contentId = contentId.slice(1); // get rid of the '#'
+	        var docRoot = wrapElement(this.el.ownerDocument);
+	        var contentTag = docRoot.content(contentId);
+	        return contentTag.val();
+	      }
+	    }
+
+	    return unescapeSpecialChars(textContent);
+	  };
+	  
+	  
+	  /*
+	   * Creates and returns an empty DOM element with tag name "empty":
+	   *   <empty></empty>
+	   */
+	  var emptyEl = function () {
+	    var el = doc.createElement('empty');
+	    return wrapElement(el);
+	  };
+	  
+	  
+	  /*
+	   * Determines if the element is empty, i.e.:
+	   *   <empty></empty>
+	   * This element is created by function `emptyEL`.
+	   */
+	  var isEmpty = function () {
+	    if (this.el.tagName.toLowerCase() === 'empty') {
+	      return true;
+	    } else {
+	      return false;
+	    }
+	  };
+	  
+	  
+	  /*
+	   * Cross-browser XML parsing supporting IE8+ and Node.js.
+	   */
+	  var parse = function (data) {
+	    // XML data must be a string
+	    if (!data || typeof data !== "string") {
+	      console.log("BB Error: XML data is not a string");
+	      return null;
+	    }
+	    
+	    var xml, parser;
+	    
+	    // Node
+	    if (isNode) {
+	      parser = new (xmldom.DOMParser)();
+	      xml = parser.parseFromString(data, "text/xml");
+	      
+	    // Browser
+	    } else {
+	      
+	      // Standard parser
+	      if (window.DOMParser) {
+	        parser = new DOMParser();
+	        xml = parser.parseFromString(data, "text/xml");
+	        
+	      // IE
+	      } else {
+	        try {
+	          xml = new ActiveXObject("Microsoft.XMLDOM");
+	          xml.async = "false";
+	          xml.loadXML(data);
+	        } catch (e) {
+	          console.log("BB ActiveX Exception: Could not parse XML");
+	        }
+	      }
+	    }
+	    
+	    if (!xml || !xml.documentElement || xml.getElementsByTagName("parsererror").length) {
+	      console.log("BB Error: Could not parse XML");
+	      return null;
+	    }
+	    
+	    return wrapElement(xml);
+	  };
+	  
+	  
+	  // Establish the root object, `window` in the browser, or `global` in Node.
+	  var root = this,
+	      xmldom,
+	      isNode = false,
+	      doc = root.document; // Will be `undefined` if we're in Node
+
+	  // Check if we're in Node. If so, pull in `xmldom` so we can simulate the DOM.
+	  if (true) {
+	    if (typeof module !== 'undefined' && module.exports) {
+	      isNode = true;
+	      xmldom = __webpack_require__(167);
+	      doc = new xmldom.DOMImplementation().createDocument();
+	    }
+	  }
+	  
+	  
+	  return {
+	    parse: parse
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * ...
+	 */
+
+	/* exported Documents */
+	var Documents = (function () {
+	  
+	  /*
+	   * ...
+	   */
+	  var detect = function (data) {
+	    if (!data.template) {
+	      return 'json';
+	    }
+	    
+	    if (!data.template('2.16.840.1.113883.3.88.11.32.1').isEmpty()) {
+	      return 'c32';
+	    } else if(!data.template('2.16.840.1.113883.10.20.22.1.1').isEmpty()) {
+	      return 'ccda';
+	    }
+	  };
+	  
+	  
+	  /*
+	   * Get entries within an element (with tag name 'entry'), adds an `each` function
+	   */
+	  var entries = function () {
+	    var each = function (callback) {
+	      for (var i = 0; i < this.length; i++) {
+	        callback(this[i]);
+	      }
+	    };
+	    
+	    var els = this.elsByTag('entry');
+	    els.each = each;
+	    return els;
+	  };
+	  
+	  
+	  /*
+	   * Parses an HL7 date in String form and creates a new Date object.
+	   * 
+	   * TODO: CCDA dates can be in form:
+	   *   <effectiveTime value="20130703094812"/>
+	   * ...or:
+	   *   <effectiveTime>
+	   *     <low value="19630617120000"/>
+	   *     <high value="20110207100000"/>
+	   *   </effectiveTime>
+	   * For the latter, parseDate will not be given type `String`
+	   * and will return `null`.
+	   */
+	  var parseDate = function (str) {
+	    if (!str || typeof str !== 'string') {
+	      return null;
+	    }
+
+	    // Note: months start at 0 (so January is month 0)
+
+	    // e.g., value="1999" translates to Jan 1, 1999
+	    if (str.length === 4) {
+	      return new Date(str, 0, 1);
+	    }
+
+	    var year = str.substr(0, 4);
+	    // subtract 1 from the month since they're zero-indexed
+	    var month = parseInt(str.substr(4, 2), 10) - 1;
+	    // days are not zero-indexed. If we end up with the day 0 or '',
+	    // that will be equivalent to the last day of the previous month
+	    var day = str.substr(6, 2) || 1;
+
+	    // check for time info (the presence of at least hours and mins after the date)
+	    if (str.length >= 12) {
+	      var hour = str.substr(8, 2);
+	      var min = str.substr(10, 2);
+	      var secs = str.substr(12, 2);
+
+	      // check for timezone info (the presence of chars after the seconds place)
+	      if (str.length > 14) {
+	        // _utcOffsetFromString will return 0 if there's no utc offset found.
+	        var utcOffset = _utcOffsetFromString(str.substr(14));
+	        // We subtract that offset from the local time to get back to UTC
+	        // (e.g., if we're -480 mins behind UTC, we add 480 mins to get back to UTC)
+	        min = _toInt(min) - utcOffset;
+	      }
+
+	      var date = new Date(Date.UTC(year, month, day, hour, min, secs));
+	      // This flag lets us output datetime-precision in our JSON even if the time happens
+	      // to translate to midnight local time. If we clone the date object, it is not
+	      // guaranteed to survive.
+	      date._parsedWithTimeData = true;
+	      return date;
+	    }
+
+	    return new Date(year, month, day);
+	  };
+
+	  // These regexes and the two functions below are copied from moment.js
+	  // http://momentjs.com/
+	  // https://github.com/moment/moment/blob/develop/LICENSE
+	  var parseTimezoneChunker = /([\+\-]|\d\d)/gi;
+	  var parseTokenTimezone = /Z|[\+\-]\d\d:?\d\d/gi; // +00:00 -00:00 +0000 -0000 or Z
+	  function _utcOffsetFromString(string) {
+	      string = string || '';
+	      var possibleTzMatches = (string.match(parseTokenTimezone) || []),
+	          tzChunk = possibleTzMatches[possibleTzMatches.length - 1] || [],
+	          parts = (tzChunk + '').match(parseTimezoneChunker) || ['-', 0, 0],
+	          minutes = +(parts[1] * 60) + _toInt(parts[2]);
+
+	      return parts[0] === '+' ? minutes : -minutes;
+	  }
+	  function _toInt(argumentForCoercion) {
+	      var coercedNumber = +argumentForCoercion,
+	          value = 0;
+
+	      if (coercedNumber !== 0 && isFinite(coercedNumber)) {
+	          if (coercedNumber >= 0) {
+	              value = Math.floor(coercedNumber);
+	          } else {
+	              value = Math.ceil(coercedNumber);
+	          }
+	      }
+
+	      return value;
+	  }
+	  
+	  
+	  /*
+	   * Parses an HL7 name (prefix / given [] / family)
+	   */
+	  var parseName = function (nameEl) {
+	    var prefix = nameEl.tag('prefix').val();
+	    
+	    var els = nameEl.elsByTag('given');
+	    var given = [];
+	    for (var i = 0; i < els.length; i++) {
+	      var val = els[i].val();
+	      if (val) { given.push(val); }
+	    }
+	    
+	    var family = nameEl.tag('family').val();
+	    
+	    return {
+	      prefix: prefix,
+	      given: given,
+	      family: family
+	    };
+	  };
+	  
+	  
+	  /*
+	   * Parses an HL7 address (streetAddressLine [], city, state, postalCode, country)
+	   */
+	  var parseAddress = function (addrEl) {
+	    var els = addrEl.elsByTag('streetAddressLine');
+	    var street = [];
+	    
+	    for (var i = 0; i < els.length; i++) {
+	      var val = els[i].val();
+	      if (val) { street.push(val); }
+	    }
+	    
+	    var city = addrEl.tag('city').val(),
+	        state = addrEl.tag('state').val(),
+	        zip = addrEl.tag('postalCode').val(),
+	        country = addrEl.tag('country').val();
+	    
+	    return {
+	      street: street,
+	      city: city,
+	      state: state,
+	      zip: zip,
+	      country: country
+	    };
+	  };
+
+	  // Node-specific code for unit tests
+	  if (true) {
+	    if (typeof module !== 'undefined' && module.exports) {
+	      module.exports = {
+	        parseDate: parseDate
+	      };
+	    }
+	  }
+	  
+	  
+	  return {
+	    detect: detect,
+	    entries: entries,
+	    parseDate: parseDate,
+	    parseName: parseName,
+	    parseAddress: parseAddress
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * ...
+	 */
+
+	Documents.C32 = (function () {
+	  
+	  /*
+	   * Preprocesses the C32 document
+	   */
+	  var process = function (c32) {
+	    c32.section = section;
+	    return c32;
+	  };
+	  
+	  
+	  /*
+	   * Finds the section of a C32 document
+	   *
+	   * Usually we check first for the HITSP section ID and then for the HL7-CCD ID.
+	   */
+	  var section = function (name) {
+	    var el, entries = Documents.entries;
+	    
+	    switch (name) {
+	      case 'document':
+	        return this.template('2.16.840.1.113883.3.88.11.32.1');
+	      case 'allergies':
+	        el = this.template('2.16.840.1.113883.3.88.11.83.102');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.1.2');
+	        }
+	        el.entries = entries;
+	        return el;
+	      case 'demographics':
+	        return this.template('2.16.840.1.113883.3.88.11.32.1');
+	      case 'encounters':
+	        el = this.template('2.16.840.1.113883.3.88.11.83.127');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.1.3');
+	        }
+	        el.entries = entries;
+	        return el;
+	      case 'immunizations':
+	        el = this.template('2.16.840.1.113883.3.88.11.83.117');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.1.6');
+	        }
+	        el.entries = entries;
+	        return el;
+	      case 'results':
+	        el = this.template('2.16.840.1.113883.3.88.11.83.122');
+	        el.entries = entries;
+	        return el;
+	      case 'medications':
+	        el = this.template('2.16.840.1.113883.3.88.11.83.112');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.1.8');
+	        }
+	        el.entries = entries;
+	        return el;
+	      case 'problems':
+	        el = this.template('2.16.840.1.113883.3.88.11.83.103');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.1.11');
+	        }
+	        el.entries = entries;
+	        return el;
+	      case 'procedures':
+	        el = this.template('2.16.840.1.113883.3.88.11.83.108');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.1.12');
+	        }
+	        el.entries = entries;
+	        return el;
+	      case 'vitals':
+	        el = this.template('2.16.840.1.113883.3.88.11.83.119');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.1.16');
+	        }
+	        el.entries = entries;
+	        return el;
+	    }
+	    
+	    return null;
+	  };
+	  
+	  
+	  return {
+	    process: process,
+	    section: section
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * ...
+	 */
+
+	Documents.CCDA = (function () {
+	  
+	  /*
+	   * Preprocesses the CCDA document
+	   */
+	  var process = function (ccda) {
+	    ccda.section = section;
+	    return ccda;
+	  };
+	  
+	  
+	  /*
+	   * Finds the section of a CCDA document
+	   */
+	  var section = function (name) {
+	    var el, entries = Documents.entries;
+	    
+	    switch (name) {
+	      case 'document':
+	        return this.template('2.16.840.1.113883.10.20.22.1.1');
+	      case 'allergies':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.6.1');
+	        el.entries = entries;
+	        return el;
+	      case 'care_plan':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.10');
+	        el.entries = entries;
+	        return el;
+	      case 'chief_complaint':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.13');
+	        if (el.isEmpty()) {
+	          el = this.template('1.3.6.1.4.1.19376.1.5.3.1.1.13.2.1');
+	        }
+	        // no entries in Chief Complaint
+	        return el;
+	      case 'demographics':
+	        return this.template('2.16.840.1.113883.10.20.22.1.1');
+	      case 'encounters':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.22');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.22.2.22.1');
+	        }
+	        el.entries = entries;
+	        return el;
+	      case 'functional_statuses':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.14');
+	        el.entries = entries;
+	        return el;
+	      case 'immunizations':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.2.1');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.22.2.2');
+	        }
+	        el.entries = entries;
+	        return el;
+	      case 'instructions':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.45');
+	        el.entries = entries;
+	        return el;
+	      case 'results':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.3.1');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.22.2.3');
+	        }
+	        el.entries = entries;
+	        return el;
+	      case 'medications':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.1.1');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.22.2.1');
+	        }
+	        el.entries = entries;
+	        return el;
+	      case 'problems':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.5.1');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.22.2.5');
+	        }
+	        el.entries = entries;
+	        return el;
+	      case 'procedures':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.7.1');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.22.2.7');
+	        }
+	        el.entries = entries;
+	        return el;
+	      case 'social_history':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.17');
+	        el.entries = entries;
+	        return el;
+	      case 'vitals':
+	        el = this.template('2.16.840.1.113883.10.20.22.2.4.1');
+	        if (el.isEmpty()) {
+	          el = this.template('2.16.840.1.113883.10.20.22.2.4');
+	        }
+	        el.entries = entries;
+	        return el;
+	    }
+	    
+	    return null;
+	  };
+	  
+	  
+	  return {
+	    process: process,
+	    section: section
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * ...
+	 */
+
+	/* exported Generators */
+	var Generators = (function () {
+	  
+	  var method = function () {};
+
+	  /* Import ejs if we're in Node. Then setup custom formatting filters
+	   */
+	  if (true) {
+	    if (typeof module !== 'undefined' && module.exports) {
+	      ejs = __webpack_require__(170);
+	    }
+	  }
+
+	  if (typeof ejs !== 'undefined') {
+	    /* Filters are automatically available to ejs to be used like "... | hl7Date"
+	     * Helpers are functions that we'll manually pass in to ejs.
+	     * The intended distinction is that a helper gets called with regular function-call syntax
+	     */
+	    var pad = function(number) {
+	      if (number < 10) {
+	        return '0' + number;
+	      }
+	      return String(number);
+	    };
+
+	    ejs.filters.hl7Date = function(obj) {
+	      try {
+	          if (obj === null || obj === undefined) { return 'nullFlavor="UNK"'; }
+	          var date = new Date(obj);
+	          if (isNaN(date.getTime())) { return obj; }
+
+	          var dateStr = null;
+	          if (date.getHours() || date.getMinutes() || date.getSeconds()) {
+	            // If there's a meaningful time, output a UTC datetime
+	            dateStr = date.getUTCFullYear() +
+	              pad( date.getUTCMonth() + 1 ) +
+	              pad( date.getUTCDate() );
+	            var timeStr = pad( date.getUTCHours() ) +
+	              pad( date.getUTCMinutes() ) +
+	              pad ( date.getUTCSeconds() ) +
+	              "+0000";
+	            return 'value="' + dateStr + timeStr + '"';
+	           
+	          } else {
+	            // If there's no time, don't apply timezone tranformations: just output a date
+	            dateStr = String(date.getFullYear()) +
+	              pad( date.getMonth() + 1 ) +
+	              pad( date.getDate() );
+	            return 'value="' + dateStr + '"';
+	          }
+
+	      } catch (e) {
+	          return obj;
+	      }
+	    };
+
+	    var escapeSpecialChars = function(s) {
+	      return s.replace(/</g, '&lt;')
+	              .replace(/>/g, '&gt;')
+	              .replace(/&/g, '&amp;')
+	              .replace(/"/g, '&quot;')
+	              .replace(/'/g, '&apos;');
+	    };
+
+	    ejs.filters.hl7Code = function(obj) {
+	      if (!obj) { return ''; }
+
+	      var tag = '';
+	      var name = obj.name || '';
+	      if (obj.name) { tag += 'displayName="'+escapeSpecialChars(name)+'"'; }
+
+	      if (obj.code) {
+	        tag += ' code="'+obj.code+'"';
+	        if (obj.code_system) { tag += ' codeSystem="'+escapeSpecialChars(obj.code_system)+'"'; }
+	        if (obj.code_system_name) { tag += ' codeSystemName="' +
+	                                        escapeSpecialChars(obj.code_system_name)+'"'; }
+	      } else {
+	        tag += ' nullFlavor="UNK"';
+	      }
+
+	      if (!obj.name && ! obj.code) {
+	        return 'nullFlavor="UNK"';
+	      }
+	      
+	      return tag;
+	    };
+
+	    ejs.filters.emptyStringIfFalsy = function(obj) {
+	      if (!obj) { return ''; }
+	      return obj;
+	    };
+
+	    if (!ejs.helpers) ejs.helpers = {};
+	    ejs.helpers.simpleTag = function(tagName, value) {
+	      if (value) {
+	        return "<"+tagName+">"+value+"</"+tagName+">";
+	      } else {
+	        return "<"+tagName+" nullFlavor=\"UNK\" />";
+	      }
+	    };
+
+	    ejs.helpers.addressTags = function(addressDict) {
+	      if (!addressDict) {
+	        return '<streetAddressLine nullFlavor="NI" />\n' +
+	                '<city nullFlavor="NI" />\n' +
+	                '<state nullFlavor="NI" />\n' +
+	                '<postalCode nullFlavor="NI" />\n' +
+	                '<country nullFlavor="NI" />\n';
+	      }
+	      
+	      var tags = '';
+	      if (!addressDict.street.length) {
+	        tags += ejs.helpers.simpleTag('streetAddressLine', null) + '\n';
+	      } else {
+	        for (var i=0; i<addressDict.street.length; i++) {
+	          tags += ejs.helpers.simpleTag('streetAddressLine', addressDict.street[i]) + '\n';
+	        }
+	      }
+	      tags += ejs.helpers.simpleTag('city', addressDict.city) + '\n';
+	      tags += ejs.helpers.simpleTag('state', addressDict.state) + '\n';
+	      tags += ejs.helpers.simpleTag('postalCode', addressDict.zip) + '\n';
+	      tags += ejs.helpers.simpleTag('country', addressDict.country) + '\n';
+	      return tags;
+	    };
+
+	    ejs.helpers.nameTags = function(nameDict) {
+	      if (!nameDict) {
+	        return '<given nullFlavor="NI" />\n' +
+	                '<family nullFlavor="NI" />\n';
+	      }
+
+	      var tags = '';
+	      if (nameDict.prefix) {
+	        tags += ejs.helpers.simpleTag('prefix', nameDict.prefix) + '\n';
+	      }
+	      if (!nameDict.given.length) {
+	        tags += ejs.helpers.simpleTag('given', null) + '\n';
+	      } else {
+	        for (var i=0; i<nameDict.given.length; i++) {
+	          tags += ejs.helpers.simpleTag('given', nameDict.given[i]) + '\n';
+	        }
+	      }
+	      tags += ejs.helpers.simpleTag('family', nameDict.family) + '\n';
+	      if (nameDict.suffix) {
+	        tags += ejs.helpers.simpleTag('suffix', nameDict.suffix) + '\n';
+	      }
+	      return tags;
+	    };
+
+	  }
+	  
+	  return {
+	    method: method
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * ...
+	 */
+
+	Generators.C32 = (function () {
+	  
+	  /*
+	   * Generates a C32 document
+	   */
+	  var run = function (json, template, testingMode) {
+	    /* jshint unused: false */ // only until this stub is actually implemented
+	    console.log("C32 generation is not implemented yet");
+	    return null;
+	  };
+	  
+	  return {
+	    run: run
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * ...
+	 */
+
+	Generators.CCDA = (function () {
+	  
+	  /*
+	   * Generates a CCDA document
+	   * A lot of the EJS setup happens in generators.js
+	   *
+	   * If `testingMode` is true, we'll set the "now" variable to a specific,
+	   * fixed time, so that the expected XML doesn't change across runs
+	   */
+	  var run = function (json, template, testingMode) {
+	    if (!ejs) {
+	      console.log("The BB.js Generator (JSON->XML) requires the EJS template package. " +
+	                  "Install it in Node or include it before this package in the browser.");
+	      return null;
+	    }
+	    if (!template) {
+	      console.log("Please provide a template EJS file for the Generator to use. " +
+	                  "Load it via fs.readFileSync in Node or XHR in the browser.");
+	      return null;
+	    }
+
+	    // `now` is actually now, unless we're running this for a test,
+	    // in which case it's always Jan 1, 2000 at 12PM UTC
+	    var now = (testingMode) ?
+	      new Date('2000-01-01T12:00:00Z') : new Date();
+
+	    var ccda = ejs.render(template, {
+	      filename: 'ccda.xml',
+	      bb: json,
+	      now: now,
+	      tagHelpers: ejs.helpers,
+	      codes: Core.Codes
+	    });
+	    return ccda;
+	  };
+	  
+	  return {
+	    run: run
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * ...
+	 */
+
+	/* exported Parsers */
+	var Parsers = (function () {
+	  
+	  var method = function () {};
+	  
+	  return {
+	    method: method
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * Parser for the C32 document
+	 */
+
+	Parsers.C32 = (function () {
+	  
+	  var run = function (c32) {
+	    var data = {};
+	    
+	    data.document              = Parsers.C32.document(c32);
+	    data.allergies             = Parsers.C32.allergies(c32);
+	    data.demographics          = Parsers.C32.demographics(c32);
+	    data.encounters            = Parsers.C32.encounters(c32);
+	    data.immunizations         = Parsers.C32.immunizations(c32).administered;
+	    data.immunization_declines = Parsers.C32.immunizations(c32).declined;
+	    data.results               = Parsers.C32.results(c32);
+	    data.medications           = Parsers.C32.medications(c32);
+	    data.problems              = Parsers.C32.problems(c32);
+	    data.procedures            = Parsers.C32.procedures(c32);
+	    data.vitals                = Parsers.C32.vitals(c32);
+	    
+	    data.json                       = Core.json;
+	    data.document.json              = Core.json;
+	    data.allergies.json             = Core.json;
+	    data.demographics.json          = Core.json;
+	    data.encounters.json            = Core.json;
+	    data.immunizations.json         = Core.json;
+	    data.immunization_declines.json = Core.json;
+	    data.results.json               = Core.json;
+	    data.medications.json           = Core.json;
+	    data.problems.json              = Core.json;
+	    data.procedures.json            = Core.json;
+	    data.vitals.json                = Core.json;
+
+	    // Sections that are in CCDA but not C32... we want to keep the API
+	    // consistent, even if the entries are always null
+	    data.smoking_status = {
+	      date: null,
+	      name: null,
+	      code: null,
+	      code_system: null,
+	      code_system_name: null
+	    };
+	    data.smoking_status.json = Core.json;
+	    
+	    data.chief_complaint = {
+	      text: null
+	    };
+	    data.chief_complaint.json = Core.json;
+
+	    data.care_plan = [];
+	    data.care_plan.json = Core.json;
+
+	    data.instructions = [];
+	    data.instructions.json = Core.json;
+
+	    data.functional_statuses = [];
+	    data.functional_statuses.json = Core.json;
+	    
+	    return data;
+	  };
+
+	  return {
+	    run: run
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * Parser for the C32 document section
+	 */
+
+	Parsers.C32.document = function (c32) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = {}, el;
+	  
+	  var doc = c32.section('document');
+
+	  var date = parseDate(doc.tag('effectiveTime').attr('value'));
+	  var title = Core.stripWhitespace(doc.tag('title').val());
+	  
+	  var author = doc.tag('author');
+	  el = author.tag('assignedPerson').tag('name');
+	  var name_dict = parseName(el);
+	  // Sometimes C32s include names that are just like <name>String</name>
+	  // and we still want to get something out in that case
+	  if (!name_dict.prefix && !name_dict.given.length && !name_dict.family) {
+	   name_dict.family = el.val();
+	  }
+	  
+	  el = author.tag('addr');
+	  var address_dict = parseAddress(el);
+	  
+	  el = author.tag('telecom');
+	  var work_phone = el.attr('value');
+
+	  var documentation_of_list = [];
+	  var performers = doc.tag('documentationOf').elsByTag('performer');
+	  for (var i = 0; i < performers.length; i++) {
+	    el = performers[i].tag('assignedPerson').tag('name');
+	    var performer_name_dict = parseName(el);
+	    var performer_phone = performers[i].tag('telecom').attr('value');
+	    var performer_addr = parseAddress(el.tag('addr'));
+	    documentation_of_list.push({
+	      name: performer_name_dict,
+	      phone: {
+	        work: performer_phone
+	      },
+	      address: performer_addr
+	    });
+	  }
+
+	  el = doc.tag('encompassingEncounter');
+	  var location_name = Core.stripWhitespace(el.tag('name').val());
+	  var location_addr_dict = parseAddress(el.tag('addr'));
+	  
+	  var encounter_date = null;
+	  el = el.tag('effectiveTime');
+	  if (!el.isEmpty()) {
+	    encounter_date = parseDate(el.attr('value'));
+	  }
+	  
+	  data = {
+	    date: date,
+	    title: title,
+	    author: {
+	      name: name_dict,
+	      address: address_dict,
+	      phone: {
+	        work: work_phone
+	      }
+	    },
+	    documentation_of: documentation_of_list,
+	    location: {
+	      name: location_name,
+	      address: location_addr_dict,
+	      encounter_date: encounter_date
+	    }
+	  };
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the C32 allergies section
+	 */
+
+	Parsers.C32.allergies = function (c32) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = [], el;
+	  
+	  var allergies = c32.section('allergies');
+	  
+	  allergies.entries().each(function(entry) {
+	    
+	    el = entry.tag('effectiveTime');
+	    var start_date = parseDate(el.tag('low').attr('value')),
+	        end_date = parseDate(el.tag('high').attr('value'));
+	    
+	    el = entry.template('2.16.840.1.113883.3.88.11.83.6').tag('code');
+	    var name = el.attr('displayName'),
+	        code = el.attr('code'),
+	        code_system = el.attr('codeSystem'),
+	        code_system_name = el.attr('codeSystemName');
+	    
+	    // value => reaction_type
+	    el = entry.template('2.16.840.1.113883.3.88.11.83.6').tag('value');
+	    var reaction_type_name = el.attr('displayName'),
+	        reaction_type_code = el.attr('code'),
+	        reaction_type_code_system = el.attr('codeSystem'),
+	        reaction_type_code_system_name = el.attr('codeSystemName');
+	    
+	    // reaction
+	    el = entry.template('2.16.840.1.113883.10.20.1.54').tag('value');
+	    var reaction_name = el.attr('displayName'),
+	        reaction_code = el.attr('code'),
+	        reaction_code_system = el.attr('codeSystem');
+	    
+	    // an irregularity seen in some c32s
+	    if (!reaction_name) {
+	      el = entry.template('2.16.840.1.113883.10.20.1.54').tag('text');
+	      if (!el.isEmpty()) {
+	        reaction_name = Core.stripWhitespace(el.val());
+	      }
+	    }
+
+	    // severity
+	    el = entry.template('2.16.840.1.113883.10.20.1.55').tag('value');
+	    var severity = el.attr('displayName');
+	    
+	    // participant => allergen
+	    el = entry.tag('participant').tag('code');
+	    var allergen_name = el.attr('displayName'),
+	        allergen_code = el.attr('code'),
+	        allergen_code_system = el.attr('codeSystem'),
+	        allergen_code_system_name = el.attr('codeSystemName');
+
+	    // another irregularity seen in some c32s
+	    if (!allergen_name) {
+	      el = entry.tag('participant').tag('name');
+	      if (!el.isEmpty()) {
+	        allergen_name = el.val();
+	      }
+	    }
+	    if (!allergen_name) {
+	      el = entry.template('2.16.840.1.113883.3.88.11.83.6').tag('originalText');
+	      if (!el.isEmpty()) {
+	        allergen_name = Core.stripWhitespace(el.val());
+	      }
+	    }
+	    
+	    // status
+	    el = entry.template('2.16.840.1.113883.10.20.1.39').tag('value');
+	    var status = el.attr('displayName');
+	    
+	    data.push({
+	      date_range: {
+	        start: start_date,
+	        end: end_date
+	      },
+	      name: name,
+	      code: code,
+	      code_system: code_system,
+	      code_system_name: code_system_name,
+	      status: status,
+	      severity: severity,
+	      reaction: {
+	        name: reaction_name,
+	        code: reaction_code,
+	        code_system: reaction_code_system
+	      },
+	      reaction_type: {
+	        name: reaction_type_name,
+	        code: reaction_type_code,
+	        code_system: reaction_type_code_system,
+	        code_system_name: reaction_type_code_system_name
+	      },
+	      allergen: {
+	        name: allergen_name,
+	        code: allergen_code,
+	        code_system: allergen_code_system,
+	        code_system_name: allergen_code_system_name
+	      }
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the C32 demographics section
+	 */
+
+	Parsers.C32.demographics = function (c32) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = {}, el;
+	  
+	  var demographics = c32.section('demographics');
+	  
+	  var patient = demographics.tag('patientRole');
+	  el = patient.tag('patient').tag('name');
+	  var patient_name_dict = parseName(el);
+	  
+	  el = patient.tag('patient');
+	  var dob = parseDate(el.tag('birthTime').attr('value')),
+	      gender = Core.Codes.gender(el.tag('administrativeGenderCode').attr('code')),
+	      marital_status = Core.Codes.maritalStatus(el.tag('maritalStatusCode').attr('code'));
+	  
+	  el = patient.tag('addr');
+	  var patient_address_dict = parseAddress(el);
+	  
+	  el = patient.tag('telecom');
+	  var home = el.attr('value'),
+	      work = null,
+	      mobile = null;
+	  
+	  var email = null;
+	  
+	  var language = patient.tag('languageCommunication').tag('languageCode').attr('code'),
+	      race = patient.tag('raceCode').attr('displayName'),
+	      ethnicity = patient.tag('ethnicGroupCode').attr('displayName'),
+	      religion = patient.tag('religiousAffiliationCode').attr('displayName');
+	  
+	  el = patient.tag('birthplace');
+	  var birthplace_dict = parseAddress(el);
+	  
+	  el = patient.tag('guardian');
+	  var guardian_relationship = el.tag('code').attr('displayName'),
+	    guardian_relationship_code = el.tag('code').attr('code'),
+	      guardian_home = el.tag('telecom').attr('value');
+	  
+	  el = el.tag('guardianPerson').tag('name');
+	  var guardian_name_dict = parseName(el);
+	  
+	  el = patient.tag('guardian').tag('addr');
+	  var guardian_address_dict = parseAddress(el);
+	  
+	  el = patient.tag('providerOrganization');
+	  var provider_organization = el.tag('name').val(),
+	      provider_phone = el.tag('telecom').attr('value'),
+	      provider_address_dict = parseAddress(el.tag('addr'));
+	  
+	  data = {
+	    name: patient_name_dict,
+	    dob: dob,
+	    gender: gender,
+	    marital_status: marital_status,
+	    address: patient_address_dict,
+	    phone: {
+	      home: home,
+	      work: work,
+	      mobile: mobile
+	    },
+	    email: email,
+	    language: language,
+	    race: race,
+	    ethnicity: ethnicity,
+	    religion: religion,
+	    birthplace: {
+	      state: birthplace_dict.state,
+	      zip: birthplace_dict.zip,
+	      country: birthplace_dict.country
+	    },
+	    guardian: {
+	      name: {
+	        given: guardian_name_dict.given,
+	        family: guardian_name_dict.family
+	      },
+	      relationship: guardian_relationship,
+	      relationship_code: guardian_relationship_code,
+	      address: guardian_address_dict,
+	      phone: {
+	        home: guardian_home
+	      }
+	    },
+	    provider: {
+	      organization: provider_organization,
+	      phone: provider_phone,
+	      address: provider_address_dict
+	    }
+	  };
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the C32 encounters section
+	 */
+
+	Parsers.C32.encounters = function (c32) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = [], el;
+	  
+	  var encounters = c32.section('encounters');
+	  
+	  encounters.entries().each(function(entry) {
+	    
+	    var date = parseDate(entry.tag('effectiveTime').attr('value'));
+	    if (!date) {
+	      date = parseDate(entry.tag('effectiveTime').tag('low').attr('value'));
+	    }
+	    
+	    el = entry.tag('code');
+	    var name = el.attr('displayName'),
+	        code = el.attr('code'),
+	        code_system = el.attr('codeSystem'),
+	        code_system_name = el.attr('codeSystemName'),
+	        code_system_version = el.attr('codeSystemVersion');
+	    
+	    // translation
+	    el = entry.tag('translation');
+	    var translation_name = el.attr('displayName'),
+	        translation_code = el.attr('code'),
+	        translation_code_system = el.attr('codeSystem'),
+	        translation_code_system_name = el.attr('codeSystemName');
+	    
+	    // performer
+	    el = entry.tag('performer');
+	    var performer_name = el.tag('name').val(),
+	        performer_code = el.attr('code'),
+	        performer_code_system = el.attr('codeSystem'),
+	        performer_code_system_name = el.attr('codeSystemName');
+	    
+	    // participant => location
+	    el = entry.tag('participant');
+	    var organization = el.tag('name').val(),
+	        location_dict = parseAddress(el);
+	    location_dict.organization = organization;
+
+	    // findings
+	    var findings = [];
+	    var findingEls = entry.elsByTag('entryRelationship');
+	    for (var i = 0; i < findingEls.length; i++) {
+	      el = findingEls[i].tag('value');
+	      findings.push({
+	        name: el.attr('displayName'),
+	        code: el.attr('code'),
+	        code_system: el.attr('codeSystem')
+	      });
+	    }
+	    
+	    data.push({
+	      date: date,
+	      name: name,
+	      code: code,
+	      code_system: code_system,
+	      code_system_name: code_system_name,
+	      code_system_version: code_system_version,
+	      findings: findings,
+	      translation: {
+	        name: translation_name,
+	        code: translation_code,
+	        code_system: translation_code_system,
+	        code_system_name: translation_code_system_name
+	      },
+	      performer: {
+	        name: performer_name,
+	        code: performer_code,
+	        code_system: performer_code_system,
+	        code_system_name: performer_code_system_name
+	      },
+	      location: location_dict
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the C32 immunizations section
+	 */
+
+	Parsers.C32.immunizations = function (c32) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var administeredData = [], declinedData = [], el, product;
+	  
+	  var immunizations = c32.section('immunizations');
+	  
+	  immunizations.entries().each(function(entry) {
+	    
+	    // date
+	    el = entry.tag('effectiveTime');
+	    var date = parseDate(el.attr('value'));
+	    if (!date) {
+	      date = parseDate(el.tag('low').attr('value'));
+	    }
+
+	    // if 'declined' is true, this is a record that this vaccine WASN'T administered
+	    el = entry.tag('substanceAdministration');
+	    var declined = el.boolAttr('negationInd');
+
+	    // product
+	    product = entry.template('2.16.840.1.113883.10.20.1.53');
+	    el = product.tag('code');
+	    var product_name = el.attr('displayName'),
+	        product_code = el.attr('code'),
+	        product_code_system = el.attr('codeSystem'),
+	        product_code_system_name = el.attr('codeSystemName');
+
+	    // translation
+	    el = product.tag('translation');
+	    var translation_name = el.attr('displayName'),
+	        translation_code = el.attr('code'),
+	        translation_code_system = el.attr('codeSystem'),
+	        translation_code_system_name = el.attr('codeSystemName');
+
+	    // misc product details
+	    el = product.tag('lotNumberText');
+	    var lot_number = el.val();
+
+	    el = product.tag('manufacturerOrganization');
+	    var manufacturer_name = el.tag('name').val();
+	    
+	    // route
+	    el = entry.tag('routeCode');
+	    var route_name = el.attr('displayName'),
+	        route_code = el.attr('code'),
+	        route_code_system = el.attr('codeSystem'),
+	        route_code_system_name = el.attr('codeSystemName');
+	    
+	    // instructions
+	    el = entry.template('2.16.840.1.113883.10.20.1.49');
+	    var instructions_text = Core.stripWhitespace(el.tag('text').val());
+	    el = el.tag('code');
+	    var education_name = el.attr('displayName'),
+	        education_code = el.attr('code'),
+	        education_code_system = el.attr('codeSystem');
+
+	    // dose
+	    el = entry.tag('doseQuantity');
+	    var dose_value = el.attr('value'),
+	        dose_unit = el.attr('unit');
+	    
+	    var data = (declined) ? declinedData : administeredData;
+	    data.push({
+	      date: date,
+	      product: {
+	        name: product_name,
+	        code: product_code,
+	        code_system: product_code_system,
+	        code_system_name: product_code_system_name,
+	        translation: {
+	          name: translation_name,
+	          code: translation_code,
+	          code_system: translation_code_system,
+	          code_system_name: translation_code_system_name
+	        },
+	        lot_number: lot_number,
+	        manufacturer_name: manufacturer_name
+	      },
+	      dose_quantity: {
+	        value: dose_value,
+	        unit: dose_unit
+	      },
+	      route: {
+	        name: route_name,
+	        code: route_code,
+	        code_system: route_code_system,
+	        code_system_name: route_code_system_name
+	      },
+	      instructions: instructions_text,
+	      education_type: {
+	        name: education_name,
+	        code: education_code,
+	        code_system: education_code_system
+	      }
+	    });
+	  });
+	  
+	  return {
+	    administered: administeredData,
+	    declined: declinedData
+	  };
+	};
+	;
+
+	/*
+	 * Parser for the C32 results (labs) section
+	 */
+
+	Parsers.C32.results = function (c32) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = [], el;
+	  
+	  var results = c32.section('results');
+	  
+	  results.entries().each(function(entry) {
+	    
+	    el = entry.tag('effectiveTime');
+	    var panel_date = parseDate(entry.tag('effectiveTime').attr('value'));
+	    if (!panel_date) {
+	      panel_date = parseDate(entry.tag('effectiveTime').tag('low').attr('value'));
+	    }
+	    
+	    // panel
+	    el = entry.tag('code');
+	    var panel_name = el.attr('displayName'),
+	        panel_code = el.attr('code'),
+	        panel_code_system = el.attr('codeSystem'),
+	        panel_code_system_name = el.attr('codeSystemName');
+	    
+	    var observation;
+	    var tests = entry.elsByTag('observation');
+	    var tests_data = [];
+	    
+	    for (var i = 0; i < tests.length; i++) {
+	      observation = tests[i];
+	      
+	      // sometimes results organizers contain non-results. we only want tests
+	      if (observation.template('2.16.840.1.113883.10.20.1.31').val()) {
+	        var date = parseDate(observation.tag('effectiveTime').attr('value'));
+	        
+	        el = observation.tag('code');
+	        var name = el.attr('displayName'),
+	            code = el.attr('code'),
+	            code_system = el.attr('codeSystem'),
+	            code_system_name = el.attr('codeSystemName');
+
+	        if (!name) {
+	          name = Core.stripWhitespace(observation.tag('text').val());
+	        }
+	    
+	        el = observation.tag('translation');
+	        var translation_name = el.attr('displayName'),
+	        translation_code = el.attr('code'),
+	        translation_code_system = el.attr('codeSystem'),
+	        translation_code_system_name = el.attr('codeSystemName');
+	    
+	        el = observation.tag('value');
+	        var value = el.attr('value'),
+	            unit = el.attr('unit');
+	        // We could look for xsi:type="PQ" (physical quantity) but it seems better
+	        // not to trust that that field has been used correctly...
+	        if (value && !isNaN(parseFloat(value))) {
+	          value = parseFloat(value);
+	        }
+	        if (!value) {
+	          value = el.val(); // look for free-text values
+	        }
+	    
+	        el = observation.tag('referenceRange');
+	        var reference_range_text = Core.stripWhitespace(el.tag('observationRange').tag('text').val()),
+	            reference_range_low_unit = el.tag('observationRange').tag('low').attr('unit'),
+	            reference_range_low_value = el.tag('observationRange').tag('low').attr('value'),
+	            reference_range_high_unit = el.tag('observationRange').tag('high').attr('unit'),
+	            reference_range_high_value = el.tag('observationRange').tag('high').attr('value');
+	        
+	        tests_data.push({
+	          date: date,
+	          name: name,
+	          value: value,
+	          unit: unit,
+	          code: code,
+	          code_system: code_system,
+	          code_system_name: code_system_name,
+	          translation: {
+	            name: translation_name,
+	            code: translation_code,
+	            code_system: translation_code_system,
+	            code_system_name: translation_code_system_name
+	          },
+	          reference_range: {
+	            text: reference_range_text,
+	            low_unit: reference_range_low_unit,
+	            low_value: reference_range_low_value,
+	            high_unit: reference_range_high_unit,
+	            high_value: reference_range_high_value,
+	          }
+	        });
+	      }
+	    }
+	    
+	    data.push({
+	      name: panel_name,
+	      code: panel_code,
+	      code_system: panel_code_system,
+	      code_system_name: panel_code_system_name,
+	      date: panel_date,
+	      tests: tests_data
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the C32 medications section
+	 */
+
+	Parsers.C32.medications = function (c32) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var data = [], el;
+	  
+	  var medications = c32.section('medications');
+	  
+	  medications.entries().each(function(entry) {
+
+	    var text = null;
+	    el = entry.tag('substanceAdministration').immediateChildTag('text');
+	    if (!el.isEmpty()) {
+	      // technically C32s don't use this, but C83s (another CCD) do,
+	      // and CCDAs do, so we may see it anyways
+	      text = Core.stripWhitespace(el.val());
+	    }
+
+	    var effectiveTimes = entry.elsByTag('effectiveTime');
+
+	    el = effectiveTimes[0]; // the first effectiveTime is the med start date
+	    var start_date = null, end_date = null;
+	    if (el) {
+	      start_date = parseDate(el.tag('low').attr('value'));
+	      end_date = parseDate(el.tag('high').attr('value'));
+	    }
+
+	    // the second effectiveTime might the schedule period or it might just
+	    // be a random effectiveTime from further in the entry... xsi:type should tell us
+	    el = effectiveTimes[1];
+	    var schedule_type = null, schedule_period_value = null, schedule_period_unit = null;
+	    if (el && el.attr('xsi:type') === 'PIVL_TS') {
+	      var institutionSpecified = el.attr('institutionSpecified');
+	      if (institutionSpecified === 'true') {
+	        schedule_type= 'frequency';
+	      } else if (institutionSpecified === 'false') {
+	        schedule_type = 'interval';
+	      }
+
+	      el = el.tag('period');
+	      schedule_period_value = el.attr('value');
+	      schedule_period_unit = el.attr('unit');
+	    }
+	    
+	    el = entry.tag('manufacturedProduct').tag('code');
+	    var product_name = el.attr('displayName'),
+	        product_code = el.attr('code'),
+	        product_code_system = el.attr('codeSystem');
+
+	    var product_original_text = null;
+	    el = entry.tag('manufacturedProduct').tag('originalText');
+	    if (!el.isEmpty()) {
+	      product_original_text = Core.stripWhitespace(el.val());
+	    }
+	    // if we don't have a product name yet, try the originalText version
+	    if (!product_name && product_original_text) {
+	      product_name = product_original_text;
+	    }
+
+	    // irregularity in some c32s
+	    if (!product_name) {
+	      el = entry.tag('manufacturedProduct').tag('name');
+	      if (!el.isEmpty()) {
+	        product_name = Core.stripWhitespace(el.val());
+	      }
+	    }
+	    
+	    el = entry.tag('manufacturedProduct').tag('translation');
+	    var translation_name = el.attr('displayName'),
+	        translation_code = el.attr('code'),
+	        translation_code_system = el.attr('codeSystem'),
+	        translation_code_system_name = el.attr('codeSystemName');
+	    
+	    el = entry.tag('doseQuantity');
+	    var dose_value = el.attr('value'),
+	        dose_unit = el.attr('unit');
+	    
+	    el = entry.tag('rateQuantity');
+	    var rate_quantity_value = el.attr('value'),
+	        rate_quantity_unit = el.attr('unit');
+	    
+	    el = entry.tag('precondition').tag('value');
+	    var precondition_name = el.attr('displayName'),
+	        precondition_code = el.attr('code'),
+	        precondition_code_system = el.attr('codeSystem');
+	    
+	    el = entry.template('2.16.840.1.113883.10.20.1.28').tag('value');
+	    var reason_name = el.attr('displayName'),
+	        reason_code = el.attr('code'),
+	        reason_code_system = el.attr('codeSystem');
+	    
+	    el = entry.tag('routeCode');
+	    var route_name = el.attr('displayName'),
+	        route_code = el.attr('code'),
+	        route_code_system = el.attr('codeSystem'),
+	        route_code_system_name = el.attr('codeSystemName');
+	    
+	    // participant/playingEntity => vehicle
+	    el = entry.tag('participant').tag('playingEntity');
+	    var vehicle_name = el.tag('name').val();
+
+	    el = el.tag('code');
+	    // prefer the code vehicle_name but fall back to the non-coded one
+	    // (which for C32s is in fact the primary field for this info)
+	    vehicle_name = el.attr('displayName') || vehicle_name;
+	    var vehicle_code = el.attr('code'),
+	        vehicle_code_system = el.attr('codeSystem'),
+	        vehicle_code_system_name = el.attr('codeSystemName');
+	    
+	    el = entry.tag('administrationUnitCode');
+	    var administration_name = el.attr('displayName'),
+	        administration_code = el.attr('code'),
+	        administration_code_system = el.attr('codeSystem'),
+	        administration_code_system_name = el.attr('codeSystemName');
+	    
+	    // performer => prescriber
+	    el = entry.tag('performer');
+	    var prescriber_organization = el.tag('name').val(),
+	        prescriber_person = null;
+	    
+	    data.push({
+	      date_range: {
+	        start: start_date,
+	        end: end_date
+	      },
+	      text: text,
+	      product: {
+	        name: product_name,
+	        text: product_original_text,
+	        code: product_code,
+	        code_system: product_code_system,
+	        translation: {
+	          name: translation_name,
+	          code: translation_code,
+	          code_system: translation_code_system,
+	          code_system_name: translation_code_system_name
+	        }
+	      },
+	      dose_quantity: {
+	        value: dose_value,
+	        unit: dose_unit
+	      },
+	      rate_quantity: {
+	        value: rate_quantity_value,
+	        unit: rate_quantity_unit
+	      },
+	      precondition: {
+	        name: precondition_name,
+	        code: precondition_code,
+	        code_system: precondition_code_system
+	      },
+	      reason: {
+	        name: reason_name,
+	        code: reason_code,
+	        code_system: reason_code_system
+	      },
+	      route: {
+	        name: route_name,
+	        code: route_code,
+	        code_system: route_code_system,
+	        code_system_name: route_code_system_name
+	      },
+	      schedule: {
+	        type: schedule_type,
+	        period_value: schedule_period_value,
+	        period_unit: schedule_period_unit
+	      },
+	      vehicle: {
+	        name: vehicle_name,
+	        code: vehicle_code,
+	        code_system: vehicle_code_system,
+	        code_system_name: vehicle_code_system_name
+	      },
+	      administration: {
+	        name: administration_name,
+	        code: administration_code,
+	        code_system: administration_code_system,
+	        code_system_name: administration_code_system_name
+	      },
+	      prescriber: {
+	        organization: prescriber_organization,
+	        person: prescriber_person
+	      }
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the C32 problems section
+	 */
+
+	Parsers.C32.problems = function (c32) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = [], el;
+	  
+	  var problems = c32.section('problems');
+	  
+	  problems.entries().each(function(entry) {
+	    
+	    el = entry.tag('effectiveTime');
+	    var start_date = parseDate(el.tag('low').attr('value')),
+	        end_date = parseDate(el.tag('high').attr('value'));
+	    
+	    el = entry.template('2.16.840.1.113883.10.20.1.28').tag('value');
+	    var name = el.attr('displayName'),
+	        code = el.attr('code'),
+	        code_system = el.attr('codeSystem'),
+	        code_system_name = el.attr('codeSystemName');
+
+	    // Pre-C32 CCDs put the problem name in this "originalText" field, and some vendors
+	    // continue doing this with their C32, even though it's not technically correct
+	    if (!name) {
+	      el = entry.template('2.16.840.1.113883.10.20.1.28').tag('originalText');
+	      if (!el.isEmpty()) {
+	        name = Core.stripWhitespace(el.val());
+	      }
+	    }
+
+	    el = entry.template('2.16.840.1.113883.10.20.1.28').tag('translation');
+	    var translation_name = el.attr('displayName'),
+	        translation_code = el.attr('code'),
+	        translation_code_system = el.attr('codeSystem'),
+	        translation_code_system_name = el.attr('codeSystemName');
+	    
+	    el = entry.template('2.16.840.1.113883.10.20.1.50');
+	    var status = el.tag('value').attr('displayName');
+	    
+	    var age = null;
+	    el = entry.template('2.16.840.1.113883.10.20.1.38');
+	    if (!el.isEmpty()) {
+	      age = parseFloat(el.tag('value').attr('value'));
+	    }
+	    
+	    data.push({
+	      date_range: {
+	        start: start_date,
+	        end: end_date
+	      },
+	      name: name,
+	      status: status,
+	      age: age,
+	      code: code,
+	      code_system: code_system,
+	      code_system_name: code_system_name,
+	      translation: {
+	        name: translation_name,
+	        code: translation_code,
+	        code_system: translation_code_system,
+	        code_system_name: translation_code_system_name
+	      },
+	      comment: null // not part of C32
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the C32 procedures section
+	 */
+
+	Parsers.C32.procedures = function (c32) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = [], el;
+	  
+	  var procedures = c32.section('procedures');
+	  
+	  procedures.entries().each(function(entry) {
+	    
+	    el = entry.tag('effectiveTime');
+	    var date = parseDate(el.attr('value'));
+	    
+	    el = entry.tag('code');
+	    var name = el.attr('displayName'),
+	        code = el.attr('code'),
+	        code_system = el.attr('codeSystem');
+
+	    if (!name) {
+	      name = Core.stripWhitespace(entry.tag('originalText').val());
+	    }
+	    
+	    // 'specimen' tag not always present
+	    el = entry.tag('specimen').tag('code');
+	    var specimen_name = el.attr('displayName'),
+	        specimen_code = el.attr('code'),
+	        specimen_code_system = el.attr('codeSystem');
+	    
+	    el = entry.tag('performer').tag('addr');
+	    var organization = el.tag('name').val(),
+	        phone = el.tag('telecom').attr('value');
+	    
+	    var performer_dict = parseAddress(el);
+	    performer_dict.organization = organization;
+	    performer_dict.phone = phone;
+	    
+	    // participant => device
+	    el = entry.tag('participant').tag('code');
+	    var device_name = el.attr('displayName'),
+	        device_code = el.attr('code'),
+	        device_code_system = el.attr('codeSystem');
+	    
+	    data.push({
+	      date: date,
+	      name: name,
+	      code: code,
+	      code_system: code_system,
+	      specimen: {
+	        name: specimen_name,
+	        code: specimen_code,
+	        code_system: specimen_code_system
+	      },
+	      performer: performer_dict,
+	      device: {
+	        name: device_name,
+	        code: device_code,
+	        code_system: device_code_system
+	      }
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the C32 vitals section
+	 */
+
+	Parsers.C32.vitals = function (c32) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = [], el;
+	  
+	  var vitals = c32.section('vitals');
+	  
+	  vitals.entries().each(function(entry) {
+	    
+	    el = entry.tag('effectiveTime');
+	    var entry_date = parseDate(el.attr('value'));
+	    
+	    var result;
+	    var results = entry.elsByTag('component');
+	    var results_data = [];
+	    
+	    for (var j = 0; j < results.length; j++) {
+	      result = results[j];
+	      
+	      // Results
+	      
+	      el = result.tag('code');
+	      var name = el.attr('displayName'),
+	          code = el.attr('code'),
+	          code_system = el.attr('codeSystem'),
+	          code_system_name = el.attr('codeSystemName');
+	      
+	      el = result.tag('value');
+	      var value = parseFloat(el.attr('value')),
+	          unit = el.attr('unit');
+	      
+	      results_data.push({
+	        name: name,
+	        code: code,
+	        code_system: code_system,
+	        code_system_name: code_system_name,
+	        value: value,
+	        unit: unit
+	      });
+	    }
+	    
+	    data.push({
+	      date: entry_date,
+	      results: results_data
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA document
+	 */
+
+	Parsers.CCDA = (function () {
+	  
+	  var run = function (ccda) {
+	    var data = {};
+	    
+	    data.document              = Parsers.CCDA.document(ccda);
+	    data.allergies             = Parsers.CCDA.allergies(ccda);
+	    data.care_plan             = Parsers.CCDA.care_plan(ccda);
+	    data.chief_complaint       = Parsers.CCDA.free_text(ccda, 'chief_complaint');
+	    data.demographics          = Parsers.CCDA.demographics(ccda);
+	    data.encounters            = Parsers.CCDA.encounters(ccda);
+	    data.functional_statuses   = Parsers.CCDA.functional_statuses(ccda);
+	    data.immunizations         = Parsers.CCDA.immunizations(ccda).administered;
+	    data.immunization_declines = Parsers.CCDA.immunizations(ccda).declined;
+	    data.instructions          = Parsers.CCDA.instructions(ccda);
+	    data.results               = Parsers.CCDA.results(ccda);
+	    data.medications           = Parsers.CCDA.medications(ccda);
+	    data.problems              = Parsers.CCDA.problems(ccda);
+	    data.procedures            = Parsers.CCDA.procedures(ccda);
+	    data.smoking_status        = Parsers.CCDA.smoking_status(ccda);
+	    data.vitals                = Parsers.CCDA.vitals(ccda);
+	    
+	    data.json                        = Core.json;
+	    data.document.json               = Core.json;
+	    data.allergies.json              = Core.json;
+	    data.care_plan.json              = Core.json;
+	    data.chief_complaint.json        = Core.json;
+	    data.demographics.json           = Core.json;
+	    data.encounters.json             = Core.json;
+	    data.functional_statuses.json    = Core.json;
+	    data.immunizations.json          = Core.json;
+	    data.immunization_declines.json  = Core.json;
+	    data.instructions.json           = Core.json;
+	    data.results.json                = Core.json;
+	    data.medications.json            = Core.json;
+	    data.problems.json               = Core.json;
+	    data.procedures.json             = Core.json;
+	    data.smoking_status.json         = Core.json;
+	    data.vitals.json                 = Core.json;
+	    
+	    return data;
+	  };
+
+	  return {
+	    run: run
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * Parser for the CCDA document section
+	 */
+
+	Parsers.CCDA.document = function (ccda) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = {}, el;
+	  
+	  var doc = ccda.section('document');
+
+	  var date = parseDate(doc.tag('effectiveTime').attr('value'));
+	  var title = Core.stripWhitespace(doc.tag('title').val());
+	  
+	  var author = doc.tag('author');
+	  el = author.tag('assignedPerson').tag('name');
+	  var name_dict = parseName(el);
+	  
+	  el = author.tag('addr');
+	  var address_dict = parseAddress(el);
+	  
+	  el = author.tag('telecom');
+	  var work_phone = el.attr('value');
+
+	  var documentation_of_list = [];
+	  var performers = doc.tag('documentationOf').elsByTag('performer');
+	  for (var i = 0; i < performers.length; i++) {
+	    el = performers[i];
+	    var performer_name_dict = parseName(el);
+	    var performer_phone = el.tag('telecom').attr('value');
+	    var performer_addr = parseAddress(el.tag('addr'));
+	    documentation_of_list.push({
+	      name: performer_name_dict,
+	      phone: {
+	        work: performer_phone
+	      },
+	      address: performer_addr
+	    });
+	  }
+
+	  el = doc.tag('encompassingEncounter').tag('location');
+	  var location_name = Core.stripWhitespace(el.tag('name').val());
+	  var location_addr_dict = parseAddress(el.tag('addr'));
+	  
+	  var encounter_date = null;
+	  el = el.tag('effectiveTime');
+	  if (!el.isEmpty()) {
+	    encounter_date = parseDate(el.attr('value'));
+	  }
+	  
+	  data = {
+	    date: date,
+	    title: title,
+	    author: {
+	      name: name_dict,
+	      address: address_dict,
+	      phone: {
+	        work: work_phone
+	      }
+	    },
+	    documentation_of: documentation_of_list,
+	    location: {
+	      name: location_name,
+	      address: location_addr_dict,
+	      encounter_date: encounter_date
+	    }
+	  };
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA allergies section
+	 */
+
+	Parsers.CCDA.allergies = function (ccda) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = [], el;
+	  
+	  var allergies = ccda.section('allergies');
+	  
+	  allergies.entries().each(function(entry) {
+	    
+	    el = entry.tag('effectiveTime');
+	    var start_date = parseDate(el.tag('low').attr('value')),
+	        end_date = parseDate(el.tag('high').attr('value'));
+	    
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.7').tag('code');
+	    var name = el.attr('displayName'),
+	        code = el.attr('code'),
+	        code_system = el.attr('codeSystem'),
+	        code_system_name = el.attr('codeSystemName');
+	    
+	    // value => reaction_type
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.7').tag('value');
+	    var reaction_type_name = el.attr('displayName'),
+	        reaction_type_code = el.attr('code'),
+	        reaction_type_code_system = el.attr('codeSystem'),
+	        reaction_type_code_system_name = el.attr('codeSystemName');
+	    
+	    // reaction
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.9').tag('value');
+	    var reaction_name = el.attr('displayName'),
+	        reaction_code = el.attr('code'),
+	        reaction_code_system = el.attr('codeSystem');
+	    
+	    // severity
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.8').tag('value');
+	    var severity = el.attr('displayName');
+	    
+	    // participant => allergen
+	    el = entry.tag('participant').tag('code');
+	    var allergen_name = el.attr('displayName'),
+	        allergen_code = el.attr('code'),
+	        allergen_code_system = el.attr('codeSystem'),
+	        allergen_code_system_name = el.attr('codeSystemName');
+
+	    // this is not a valid place to store the allergen name but some vendors use it
+	    if (!allergen_name) {
+	      el = entry.tag('participant').tag('name');
+	      if (!el.isEmpty()) {
+	        allergen_name = el.val();
+	      }
+	    }
+	    if (!allergen_name) {
+	      el = entry.template('2.16.840.1.113883.10.20.22.4.7').tag('originalText');
+	      if (!el.isEmpty()) {
+	        allergen_name = Core.stripWhitespace(el.val());
+	      }
+	    }
+	    
+	    // status
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.28').tag('value');
+	    var status = el.attr('displayName');
+	    
+	    data.push({
+	      date_range: {
+	        start: start_date,
+	        end: end_date
+	      },
+	      name: name,
+	      code: code,
+	      code_system: code_system,
+	      code_system_name: code_system_name,
+	      status: status,
+	      severity: severity,
+	      reaction: {
+	        name: reaction_name,
+	        code: reaction_code,
+	        code_system: reaction_code_system
+	      },
+	      reaction_type: {
+	        name: reaction_type_name,
+	        code: reaction_type_code,
+	        code_system: reaction_type_code_system,
+	        code_system_name: reaction_type_code_system_name
+	      },
+	      allergen: {
+	        name: allergen_name,
+	        code: allergen_code,
+	        code_system: allergen_code_system,
+	        code_system_name: allergen_code_system_name
+	      }
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA "plan of care" section
+	 */
+
+	Parsers.CCDA.care_plan = function (ccda) {
+	  
+	  var data = [], el;
+	  
+	  var care_plan = ccda.section('care_plan');
+	  
+	  care_plan.entries().each(function(entry) {
+	    
+	    var name = null,
+	        code = null,
+	        code_system = null,
+	        code_system_name = null;
+
+	    // Plan of care encounters, which have no other details
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.40');
+	    if (!el.isEmpty()) {
+	      name = 'encounter';
+	    } else {
+	      el = entry.tag('code');
+	      
+	      name = el.attr('displayName');
+	      code = el.attr('code');
+	      code_system = el.attr('codeSystem');
+	      code_system_name = el.attr('codeSystemName');
+	    }
+
+	    var text = Core.stripWhitespace(entry.tag('text').val());
+	    
+	    data.push({
+	      text: text,
+	      name: name,
+	      code: code,
+	      code_system: code_system,
+	      code_system_name: code_system_name,
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA demographics section
+	 */
+
+	Parsers.CCDA.demographics = function (ccda) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = {}, el;
+	  
+	  var demographics = ccda.section('demographics');
+	  
+	  var patient = demographics.tag('patientRole');
+	  el = patient.tag('patient').tag('name');
+	  var patient_name_dict = parseName(el);
+	  
+	  el = patient.tag('patient');
+	  var dob = parseDate(el.tag('birthTime').attr('value')),
+	      gender = Core.Codes.gender(el.tag('administrativeGenderCode').attr('code')),
+	      marital_status = Core.Codes.maritalStatus(el.tag('maritalStatusCode').attr('code'));
+	  
+	  el = patient.tag('addr');
+	  var patient_address_dict = parseAddress(el);
+	  
+	  el = patient.tag('telecom');
+	  var home = el.attr('value'),
+	      work = null,
+	      mobile = null;
+	  
+	  var email = null;
+	  
+	  var language = patient.tag('languageCommunication').tag('languageCode').attr('code'),
+	      race = patient.tag('raceCode').attr('displayName'),
+	      ethnicity = patient.tag('ethnicGroupCode').attr('displayName'),
+	      religion = patient.tag('religiousAffiliationCode').attr('displayName');
+	  
+	  el = patient.tag('birthplace');
+	  var birthplace_dict = parseAddress(el);
+	  
+	  el = patient.tag('guardian');
+	  var guardian_relationship = el.tag('code').attr('displayName'),
+	      guardian_relationship_code = el.tag('code').attr('code'),
+	      guardian_home = el.tag('telecom').attr('value');
+	  
+	  el = el.tag('guardianPerson').tag('name');
+	  var guardian_name_dict = parseName(el);
+	  
+	  el = patient.tag('guardian').tag('addr');
+	  var guardian_address_dict = parseAddress(el);
+	  
+	  el = patient.tag('providerOrganization');
+	  var provider_organization = el.tag('name').val(),
+	      provider_phone = el.tag('telecom').attr('value');
+	  
+	  var provider_address_dict = parseAddress(el.tag('addr'));
+	  
+	  data = {
+	    name: patient_name_dict,
+	    dob: dob,
+	    gender: gender,
+	    marital_status: marital_status,
+	    address: patient_address_dict,
+	    phone: {
+	      home: home,
+	      work: work,
+	      mobile: mobile
+	    },
+	    email: email,
+	    language: language,
+	    race: race,
+	    ethnicity: ethnicity,
+	    religion: religion,
+	    birthplace: {
+	      state: birthplace_dict.state,
+	      zip: birthplace_dict.zip,
+	      country: birthplace_dict.country
+	    },
+	    guardian: {
+	      name: {
+	        given: guardian_name_dict.given,
+	        family: guardian_name_dict.family
+	      },
+	      relationship: guardian_relationship,
+	      relationship_code: guardian_relationship_code,
+	      address: guardian_address_dict,
+	      phone: {
+	        home: guardian_home
+	      }
+	    },
+	    provider: {
+	      organization: provider_organization,
+	      phone: provider_phone,
+	      address: provider_address_dict
+	    }
+	  };
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA encounters section
+	 */
+
+	Parsers.CCDA.encounters = function (ccda) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = [], el;
+	  
+	  var encounters = ccda.section('encounters');
+	  
+	  encounters.entries().each(function(entry) {
+	    
+	    var date = parseDate(entry.tag('effectiveTime').attr('value'));
+	    
+	    el = entry.tag('code');
+	    var name = el.attr('displayName'),
+	        code = el.attr('code'),
+	        code_system = el.attr('codeSystem'),
+	        code_system_name = el.attr('codeSystemName'),
+	        code_system_version = el.attr('codeSystemVersion');
+	    
+	    // translation
+	    el = entry.tag('translation');
+	    var translation_name = el.attr('displayName'),
+	        translation_code = el.attr('code'),
+	        translation_code_system = el.attr('codeSystem'),
+	        translation_code_system_name = el.attr('codeSystemName');
+	    
+	    // performer
+	    el = entry.tag('performer').tag('code');
+	    var performer_name = el.attr('displayName'),
+	        performer_code = el.attr('code'),
+	        performer_code_system = el.attr('codeSystem'),
+	        performer_code_system_name = el.attr('codeSystemName');
+	  
+	    // participant => location
+	    el = entry.tag('participant');
+	    var organization = el.tag('code').attr('displayName');
+	    
+	    var location_dict = parseAddress(el);
+	    location_dict.organization = organization;
+
+	    // findings
+	    var findings = [];
+	    var findingEls = entry.elsByTag('entryRelationship');
+	    for (var i = 0; i < findingEls.length; i++) {
+	      el = findingEls[i].tag('value');
+	      findings.push({
+	        name: el.attr('displayName'),
+	        code: el.attr('code'),
+	        code_system: el.attr('codeSystem')
+	      });
+	    }
+	    
+	    data.push({
+	      date: date,
+	      name: name,
+	      code: code,
+	      code_system: code_system,
+	      code_system_name: code_system_name,
+	      code_system_version: code_system_version,
+	      findings: findings,
+	      translation: {
+	        name: translation_name,
+	        code: translation_code,
+	        code_system: translation_code_system,
+	        code_system_name: translation_code_system_name
+	      },
+	      performer: {
+	        name: performer_name,
+	        code: performer_code,
+	        code_system: performer_code_system,
+	        code_system_name: performer_code_system_name
+	      },
+	      location: location_dict
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for any freetext section (i.e., contains just a single <text> element)
+	 */
+
+	Parsers.CCDA.free_text = function (ccda, sectionName) {
+
+	  var data = {};
+	  
+	  var doc = ccda.section(sectionName);
+	  var text = Core.stripWhitespace(doc.tag('text').val());
+	  
+	  data = {
+	    text: text
+	  };
+
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA functional & cognitive status
+	 */
+
+	Parsers.CCDA.functional_statuses = function (ccda) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var data = [], el;
+
+	  var statuses = ccda.section('functional_statuses');
+
+	  statuses.entries().each(function(entry) {
+
+	    var date = parseDate(entry.tag('effectiveTime').attr('value'));
+	    if (!date) {
+	      date = parseDate(entry.tag('effectiveTime').tag('low').attr('value'));
+	    }
+
+	    el = entry.tag('value');
+
+	    var name = el.attr('displayName'),
+	        code = el.attr('code'),
+	        code_system = el.attr('codeSystem'),
+	        code_system_name = el.attr('codeSystemName');
+
+	    data.push({
+	      date: date,
+	      name: name,
+	      code: code,
+	      code_system: code_system,
+	      code_system_name: code_system_name
+	    });
+	  
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA immunizations section
+	 */
+
+	Parsers.CCDA.immunizations = function (ccda) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var administeredData = [], declinedData = [], el, product;
+	  
+	  var immunizations = ccda.section('immunizations');
+	  
+	  immunizations.entries().each(function(entry) {
+	    
+	    // date
+	    el = entry.tag('effectiveTime');
+	    var date = parseDate(el.attr('value'));
+	    if (!date) {
+	      date = parseDate(el.tag('low').attr('value'));
+	    }
+
+	    // if 'declined' is true, this is a record that this vaccine WASN'T administered
+	    el = entry.tag('substanceAdministration');
+	    var declined = el.boolAttr('negationInd');
+
+	    // product
+	    product = entry.template('2.16.840.1.113883.10.20.22.4.54');
+	    el = product.tag('code');
+	    var product_name = el.attr('displayName'),
+	        product_code = el.attr('code'),
+	        product_code_system = el.attr('codeSystem'),
+	        product_code_system_name = el.attr('codeSystemName');
+
+	    // translation
+	    el = product.tag('translation');
+	    var translation_name = el.attr('displayName'),
+	        translation_code = el.attr('code'),
+	        translation_code_system = el.attr('codeSystem'),
+	        translation_code_system_name = el.attr('codeSystemName');
+
+	    // misc product details
+	    el = product.tag('lotNumberText');
+	    var lot_number = el.val();
+
+	    el = product.tag('manufacturerOrganization');
+	    var manufacturer_name = el.tag('name').val();
+	    
+	    // route
+	    el = entry.tag('routeCode');
+	    var route_name = el.attr('displayName'),
+	        route_code = el.attr('code'),
+	        route_code_system = el.attr('codeSystem'),
+	        route_code_system_name = el.attr('codeSystemName');
+	    
+	    // instructions
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.20');
+	    var instructions_text = Core.stripWhitespace(el.tag('text').val());
+	    el = el.tag('code');
+	    var education_name = el.attr('displayName'),
+	        education_code = el.attr('code'),
+	        education_code_system = el.attr('codeSystem');
+
+	    // dose
+	    el = entry.tag('doseQuantity');
+	    var dose_value = el.attr('value'),
+	        dose_unit = el.attr('unit');
+	    
+	    var data = (declined) ? declinedData : administeredData;
+	    data.push({
+	      date: date,
+	      product: {
+	        name: product_name,
+	        code: product_code,
+	        code_system: product_code_system,
+	        code_system_name: product_code_system_name,
+	        translation: {
+	          name: translation_name,
+	          code: translation_code,
+	          code_system: translation_code_system,
+	          code_system_name: translation_code_system_name
+	        },
+	        lot_number: lot_number,
+	        manufacturer_name: manufacturer_name
+	      },
+	      dose_quantity: {
+	        value: dose_value,
+	        unit: dose_unit
+	      },
+	      route: {
+	        name: route_name,
+	        code: route_code,
+	        code_system: route_code_system,
+	        code_system_name: route_code_system_name
+	      },
+	      instructions: instructions_text,
+	      education_type: {
+	        name: education_name,
+	        code: education_code,
+	        code_system: education_code_system
+	      }
+	    });
+	  });
+	  
+	  return {
+	    administered: administeredData,
+	    declined: declinedData
+	  };
+	};
+	;
+
+	/*
+	 * Parser for the CCDA "plan of care" section
+	 */
+
+	Parsers.CCDA.instructions = function (ccda) {
+	  
+	  var data = [], el;
+	  
+	  var instructions = ccda.section('instructions');
+	  
+	  instructions.entries().each(function(entry) {
+
+	    el = entry.tag('code');
+	    var name = el.attr('displayName'),
+	        code = el.attr('code'),
+	        code_system = el.attr('codeSystem'),
+	        code_system_name = el.attr('codeSystemName');
+
+	    var text = Core.stripWhitespace(entry.tag('text').val());
+	    
+	    data.push({
+	      text: text,
+	      name: name,
+	      code: code,
+	      code_system: code_system,
+	      code_system_name: code_system_name
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA results (labs) section
+	 */
+
+	Parsers.CCDA.results = function (ccda) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = [], el;
+	  
+	  var results = ccda.section('results');
+	  
+	  results.entries().each(function(entry) {
+	    
+	    // panel
+	    el = entry.tag('code');
+	    var panel_name = el.attr('displayName'),
+	        panel_code = el.attr('code'),
+	        panel_code_system = el.attr('codeSystem'),
+	        panel_code_system_name = el.attr('codeSystemName');
+	    
+	    var observation;
+	    var tests = entry.elsByTag('observation');
+	    var tests_data = [];
+	    
+	    for (var i = 0; i < tests.length; i++) {
+	      observation = tests[i];
+	      
+	      var date = parseDate(observation.tag('effectiveTime').attr('value'));
+	      
+	      el = observation.tag('code');
+	      var name = el.attr('displayName'),
+	          code = el.attr('code'),
+	          code_system = el.attr('codeSystem'),
+	          code_system_name = el.attr('codeSystemName');
+
+	      if (!name) {
+	        name = Core.stripWhitespace(observation.tag('text').val());
+	      }
+	      
+	      el = observation.tag('translation');
+	      var translation_name = el.attr('displayName'),
+	        translation_code = el.attr('code'),
+	        translation_code_system = el.attr('codeSystem'),
+	        translation_code_system_name = el.attr('codeSystemName');
+	    
+	      el = observation.tag('value');
+	      var value = el.attr('value'),
+	          unit = el.attr('unit');
+	      // We could look for xsi:type="PQ" (physical quantity) but it seems better
+	      // not to trust that that field has been used correctly...
+	      if (value && !isNaN(parseFloat(value))) {
+	        value = parseFloat(value);
+	      }
+	      if (!value) {
+	        value = el.val(); // look for free-text values
+	      }
+	      
+	      el = observation.tag('referenceRange');
+	      var reference_range_text = Core.stripWhitespace(el.tag('observationRange').tag('text').val()),
+	          reference_range_low_unit = el.tag('observationRange').tag('low').attr('unit'),
+	          reference_range_low_value = el.tag('observationRange').tag('low').attr('value'),
+	          reference_range_high_unit = el.tag('observationRange').tag('high').attr('unit'),
+	          reference_range_high_value = el.tag('observationRange').tag('high').attr('value');
+	      
+	      tests_data.push({
+	        date: date,
+	        name: name,
+	        value: value,
+	        unit: unit,
+	        code: code,
+	        code_system: code_system,
+	        code_system_name: code_system_name,
+	        translation: {
+	          name: translation_name,
+	          code: translation_code,
+	          code_system: translation_code_system,
+	          code_system_name: translation_code_system_name
+	        },
+	        reference_range: {
+	          text: reference_range_text,
+	          low_unit: reference_range_low_unit,
+	          low_value: reference_range_low_value,
+	          high_unit: reference_range_high_unit,
+	          high_value: reference_range_high_value,
+	        }
+	      });
+	    }
+	    
+	    data.push({
+	      name: panel_name,
+	      code: panel_code,
+	      code_system: panel_code_system,
+	      code_system_name: panel_code_system_name,
+	      tests: tests_data
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA medications section
+	 */
+
+	Parsers.CCDA.medications = function (ccda) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var data = [], el;
+	  
+	  var medications = ccda.section('medications');
+	  
+	  medications.entries().each(function(entry) {
+	    
+	    el = entry.tag('text');
+	    var sig = Core.stripWhitespace(el.val());
+
+	    var effectiveTimes = entry.elsByTag('effectiveTime');
+
+	    el = effectiveTimes[0]; // the first effectiveTime is the med start date
+	    var start_date = null, end_date = null;
+	    if (el) {
+	      start_date = parseDate(el.tag('low').attr('value'));
+	      end_date = parseDate(el.tag('high').attr('value'));
+	    }
+
+	    // the second effectiveTime might the schedule period or it might just
+	    // be a random effectiveTime from further in the entry... xsi:type should tell us
+	    el = effectiveTimes[1];
+	    var schedule_type = null, schedule_period_value = null, schedule_period_unit = null;
+	    if (el && el.attr('xsi:type') === 'PIVL_TS') {
+	      var institutionSpecified = el.attr('institutionSpecified');
+	      if (institutionSpecified === 'true') {
+	        schedule_type= 'frequency';
+	      } else if (institutionSpecified === 'false') {
+	        schedule_type = 'interval';
+	      }
+
+	      el = el.tag('period');
+	      schedule_period_value = el.attr('value');
+	      schedule_period_unit = el.attr('unit');
+	    }
+	    
+	    el = entry.tag('manufacturedProduct').tag('code');
+	    var product_name = el.attr('displayName'),
+	        product_code = el.attr('code'),
+	        product_code_system = el.attr('codeSystem');
+
+	    var product_original_text = null;
+	    el = entry.tag('manufacturedProduct').tag('originalText');
+	    if (!el.isEmpty()) {
+	      product_original_text = Core.stripWhitespace(el.val());
+	    }
+	    // if we don't have a product name yet, try the originalText version
+	    if (!product_name && product_original_text) {
+	      product_name = product_original_text;
+	    }
+	    
+	    el = entry.tag('manufacturedProduct').tag('translation');
+	    var translation_name = el.attr('displayName'),
+	        translation_code = el.attr('code'),
+	        translation_code_system = el.attr('codeSystem'),
+	        translation_code_system_name = el.attr('codeSystemName');
+	    
+	    el = entry.tag('doseQuantity');
+	    var dose_value = el.attr('value'),
+	        dose_unit = el.attr('unit');
+	    
+	    el = entry.tag('rateQuantity');
+	    var rate_quantity_value = el.attr('value'),
+	        rate_quantity_unit = el.attr('unit');
+	    
+	    el = entry.tag('precondition').tag('value');
+	    var precondition_name = el.attr('displayName'),
+	        precondition_code = el.attr('code'),
+	        precondition_code_system = el.attr('codeSystem');
+	    
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.19').tag('value');
+	    var reason_name = el.attr('displayName'),
+	        reason_code = el.attr('code'),
+	        reason_code_system = el.attr('codeSystem');
+	    
+	    el = entry.tag('routeCode');
+	    var route_name = el.attr('displayName'),
+	        route_code = el.attr('code'),
+	        route_code_system = el.attr('codeSystem'),
+	        route_code_system_name = el.attr('codeSystemName');
+	    
+	    // participant/playingEntity => vehicle
+	    el = entry.tag('participant').tag('playingEntity');
+	    var vehicle_name = el.tag('name').val();
+
+	    el = el.tag('code');
+	    // prefer the code vehicle_name but fall back to the non-coded one
+	    vehicle_name = el.attr('displayName') || vehicle_name;
+	    var vehicle_code = el.attr('code'),
+	        vehicle_code_system = el.attr('codeSystem'),
+	        vehicle_code_system_name = el.attr('codeSystemName');
+	    
+	    el = entry.tag('administrationUnitCode');
+	    var administration_name = el.attr('displayName'),
+	        administration_code = el.attr('code'),
+	        administration_code_system = el.attr('codeSystem'),
+	        administration_code_system_name = el.attr('codeSystemName');
+	    
+	    // performer => prescriber
+	    el = entry.tag('performer');
+	    var prescriber_organization = el.tag('name').val(),
+	        prescriber_person = null;
+	    
+	    data.push({
+	      date_range: {
+	        start: start_date,
+	        end: end_date
+	      },
+	      text: sig,
+	      product: {
+	        name: product_name,
+	        code: product_code,
+	        code_system: product_code_system,
+	        text: product_original_text,
+	        translation: {
+	          name: translation_name,
+	          code: translation_code,
+	          code_system: translation_code_system,
+	          code_system_name: translation_code_system_name
+	        }
+	      },
+	      dose_quantity: {
+	        value: dose_value,
+	        unit: dose_unit
+	      },
+	      rate_quantity: {
+	        value: rate_quantity_value,
+	        unit: rate_quantity_unit
+	      },
+	      precondition: {
+	        name: precondition_name,
+	        code: precondition_code,
+	        code_system: precondition_code_system
+	      },
+	      reason: {
+	        name: reason_name,
+	        code: reason_code,
+	        code_system: reason_code_system
+	      },
+	      route: {
+	        name: route_name,
+	        code: route_code,
+	        code_system: route_code_system,
+	        code_system_name: route_code_system_name
+	      },
+	      schedule: {
+	        type: schedule_type,
+	        period_value: schedule_period_value,
+	        period_unit: schedule_period_unit
+	      },
+	      vehicle: {
+	        name: vehicle_name,
+	        code: vehicle_code,
+	        code_system: vehicle_code_system,
+	        code_system_name: vehicle_code_system_name
+	      },
+	      administration: {
+	        name: administration_name,
+	        code: administration_code,
+	        code_system: administration_code_system,
+	        code_system_name: administration_code_system_name
+	      },
+	      prescriber: {
+	        organization: prescriber_organization,
+	        person: prescriber_person
+	      }
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA problems section
+	 */
+
+	Parsers.CCDA.problems = function (ccda) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = [], el;
+	  
+	  var problems = ccda.section('problems');
+	  
+	  problems.entries().each(function(entry) {
+	    
+	    el = entry.tag('effectiveTime');
+	    var start_date = parseDate(el.tag('low').attr('value')),
+	        end_date = parseDate(el.tag('high').attr('value'));
+	    
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.4').tag('value');
+	    var name = el.attr('displayName'),
+	        code = el.attr('code'),
+	        code_system = el.attr('codeSystem'),
+	        code_system_name = el.attr('codeSystemName');
+	    
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.4').tag('translation');
+	    var translation_name = el.attr('displayName'),
+	      translation_code = el.attr('code'),
+	      translation_code_system = el.attr('codeSystem'),
+	      translation_code_system_name = el.attr('codeSystemName');
+	    
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.6');
+	    var status = el.tag('value').attr('displayName');
+	    
+	    var age = null;
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.31');
+	    if (!el.isEmpty()) {
+	      age = parseFloat(el.tag('value').attr('value'));
+	    }
+
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.64');
+	    var comment = Core.stripWhitespace(el.tag('text').val());
+	    
+	    data.push({
+	      date_range: {
+	        start: start_date,
+	        end: end_date
+	      },
+	      name: name,
+	      status: status,
+	      age: age,
+	      code: code,
+	      code_system: code_system,
+	      code_system_name: code_system_name,
+	      translation: {
+	        name: translation_name,
+	        code: translation_code,
+	        code_system: translation_code_system,
+	        code_system_name: translation_code_system_name
+	      },
+	      comment: comment
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA procedures section
+	 */
+
+	Parsers.CCDA.procedures = function (ccda) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = [], el;
+	  
+	  var procedures = ccda.section('procedures');
+	  
+	  procedures.entries().each(function(entry) {
+	    
+	    el = entry.tag('effectiveTime');
+	    var date = parseDate(el.attr('value'));
+	    
+	    el = entry.tag('code');
+	    var name = el.attr('displayName'),
+	        code = el.attr('code'),
+	        code_system = el.attr('codeSystem');
+
+	    if (!name) {
+	      name = Core.stripWhitespace(entry.tag('originalText').val());
+	    }
+	    
+	    // 'specimen' tag not always present
+	    el = entry.tag('specimen').tag('code');
+	    var specimen_name = el.attr('displayName'),
+	        specimen_code = el.attr('code'),
+	        specimen_code_system = el.attr('codeSystem');
+	    
+	    el = entry.tag('performer').tag('addr');
+	    var organization = el.tag('name').val(),
+	        phone = el.tag('telecom').attr('value');
+	    
+	    var performer_dict = parseAddress(el);
+	    performer_dict.organization = organization;
+	    performer_dict.phone = phone;
+	    
+	    // participant => device
+	    el = entry.template('2.16.840.1.113883.10.20.22.4.37').tag('code');
+	    var device_name = el.attr('displayName'),
+	        device_code = el.attr('code'),
+	        device_code_system = el.attr('codeSystem');
+	    
+	    data.push({
+	      date: date,
+	      name: name,
+	      code: code,
+	      code_system: code_system,
+	      specimen: {
+	        name: specimen_name,
+	        code: specimen_code,
+	        code_system: specimen_code_system
+	      },
+	      performer: performer_dict,
+	      device: {
+	        name: device_name,
+	        code: device_code,
+	        code_system: device_code_system
+	      }
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA smoking status in social history section
+	 */
+
+	Parsers.CCDA.smoking_status = function (ccda) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data, el;
+
+	  var name = null,
+	      code = null,
+	      code_system = null,
+	      code_system_name = null,
+	      entry_date = null;
+
+	  // We can parse all of the social_history sections,
+	  // but in practice, this section seems to be used for
+	  // smoking status, so we're just going to break that out.
+	  // And we're just looking for the first non-empty one.
+	  var social_history = ccda.section('social_history');
+	  var entries = social_history.entries();
+	  for (var i=0; i < entries.length; i++) {
+	    var entry = entries[i];
+
+	    var smoking_status = entry.template('2.16.840.1.113883.10.20.22.4.78');
+	    if (smoking_status.isEmpty()) {
+	      smoking_status = entry.template('2.16.840.1.113883.10.22.4.78');
+	    }
+	    if (smoking_status.isEmpty()) {
+	      continue;
+	    }
+
+	    el = smoking_status.tag('effectiveTime');
+	    entry_date = parseDate(el.attr('value'));
+
+	    el = smoking_status.tag('value');
+	    name = el.attr('displayName');
+	    code = el.attr('code');
+	    code_system = el.attr('codeSystem');
+	    code_system_name = el.attr('codeSystemName');
+
+	    if (name) {
+	      break;
+	    }
+	  }
+
+	  data = {
+	    date: entry_date,
+	    name: name,
+	    code: code,
+	    code_system: code_system,
+	    code_system_name: code_system_name
+	  };
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * Parser for the CCDA vitals section
+	 */
+
+	Parsers.CCDA.vitals = function (ccda) {
+	  
+	  var parseDate = Documents.parseDate;
+	  var parseName = Documents.parseName;
+	  var parseAddress = Documents.parseAddress;
+	  var data = [], el;
+	  
+	  var vitals = ccda.section('vitals');
+	  
+	  vitals.entries().each(function(entry) {
+	    
+	    el = entry.tag('effectiveTime');
+	    var entry_date = parseDate(el.attr('value'));
+	    
+	    var result;
+	    var results = entry.elsByTag('component');
+	    var results_data = [];
+	    
+	    for (var i = 0; i < results.length; i++) {
+	      result = results[i];
+	      
+	      el = result.tag('code');
+	      var name = el.attr('displayName'),
+	          code = el.attr('code'),
+	          code_system = el.attr('codeSystem'),
+	          code_system_name = el.attr('codeSystemName');
+	      
+	      el = result.tag('value');
+	      var value = parseFloat(el.attr('value')),
+	          unit = el.attr('unit');
+	      
+	      results_data.push({
+	        name: name,
+	        code: code,
+	        code_system: code_system,
+	        code_system_name: code_system_name,
+	        value: value,
+	        unit: unit
+	      });
+	    }
+	    
+	    data.push({
+	      date: entry_date,
+	      results: results_data
+	    });
+	  });
+	  
+	  return data;
+	};
+	;
+
+	/*
+	 * ...
+	 */
+
+	/* exported Renderers */
+	var Renderers = (function () {
+	  
+	  var method = function () {};
+	  
+	  return {
+	    method: method
+	  };
+	  
+	})();
+	;
+
+	/*
+	 * ...
+	 */
+
+	/* exported BlueButton */
+	var BlueButton = function (source, opts) {
+	  var type, parsedData, parsedDocument;
+	  
+	  // Look for options
+	  if (!opts) opts = {};
+	  
+	  // Detect and parse the source data
+	  parsedData = Core.parseData(source);
+	  
+	  // Detect and parse the document
+	  if (opts.parser) {
+	    
+	    // TODO: parse the document with provided custom parser
+	    parsedDocument = opts.parser();
+	    
+	  } else {
+	    type = Documents.detect(parsedData);
+	    switch (type) {
+	      case 'c32':
+	        parsedData = Documents.C32.process(parsedData);
+	        parsedDocument = Parsers.C32.run(parsedData);
+	        break;
+	      case 'ccda':
+	        parsedData = Documents.CCDA.process(parsedData);
+	        parsedDocument = Parsers.CCDA.run(parsedData);
+	        break;
+	      case 'json':
+	        /* Expects a call like:
+	         * BlueButton(json string, {
+	         *   generatorType: 'ccda',
+	         *   template: < EJS file contents >
+	         * })
+	         * The returned "type" will be the requested type (not "json")
+	         * and the XML will be turned as a string in the 'data' key
+	         */
+	        switch (opts.generatorType) {
+	          // only the unit tests ever need to worry about this testingMode argument
+	          case 'c32':
+	            type = 'c32';
+	            parsedDocument = Generators.C32.run(parsedData, opts.template, opts.testingMode);
+	            break;
+	          case 'ccda':
+	            type = 'ccda';
+	            parsedDocument = Generators.CCDA.run(parsedData, opts.template, opts.testingMode);
+	            break;
+	        }
+	    }
+	  }
+	  
+	  return {
+	    type: type,
+	    data: parsedDocument,
+	    source: parsedData
+	  };
+
+	};
+
+
+	return BlueButton;
+
+	}));
+
+
+/***/ },
+/* 167 */
+/***/ function(module, exports, __webpack_require__) {
+
+	function DOMParser(options){
+		this.options = options ||{locator:{}};
+		
+	}
+	DOMParser.prototype.parseFromString = function(source,mimeType){	
+		var options = this.options;
+		var sax =  new XMLReader();
+		var domBuilder = options.domBuilder || new DOMHandler();//contentHandler and LexicalHandler
+		var errorHandler = options.errorHandler;
+		var locator = options.locator;
+		var defaultNSMap = options.xmlns||{};
+		var entityMap = {'lt':'<','gt':'>','amp':'&','quot':'"','apos':"'"}
+		if(locator){
+			domBuilder.setDocumentLocator(locator)
+		}
+		
+		sax.errorHandler = buildErrorHandler(errorHandler,domBuilder,locator);
+		sax.domBuilder = options.domBuilder || domBuilder;
+		if(/\/x?html?$/.test(mimeType)){
+			entityMap.nbsp = '\xa0';
+			entityMap.copy = '\xa9';
+			defaultNSMap['']= 'http://www.w3.org/1999/xhtml';
+		}
+		defaultNSMap.xml = defaultNSMap.xml || 'http://www.w3.org/XML/1998/namespace';
+		if(source){
+			sax.parse(source,defaultNSMap,entityMap);
+		}else{
+			sax.errorHandler.error("invalid document source");
+		}
+		return domBuilder.document;
+	}
+	function buildErrorHandler(errorImpl,domBuilder,locator){
+		if(!errorImpl){
+			if(domBuilder instanceof DOMHandler){
+				return domBuilder;
+			}
+			errorImpl = domBuilder ;
+		}
+		var errorHandler = {}
+		var isCallback = errorImpl instanceof Function;
+		locator = locator||{}
+		function build(key){
+			var fn = errorImpl[key];
+			if(!fn && isCallback){
+				fn = errorImpl.length == 2?function(msg){errorImpl(key,msg)}:errorImpl;
+			}
+			errorHandler[key] = fn && function(msg){
+				fn('[xmldom '+key+']\t'+msg+_locator(locator));
+			}||function(){};
+		}
+		build('warning');
+		build('error');
+		build('fatalError');
+		return errorHandler;
+	}
+
+	//console.log('#\n\n\n\n\n\n\n####')
+	/**
+	 * +ContentHandler+ErrorHandler
+	 * +LexicalHandler+EntityResolver2
+	 * -DeclHandler-DTDHandler 
+	 * 
+	 * DefaultHandler:EntityResolver, DTDHandler, ContentHandler, ErrorHandler
+	 * DefaultHandler2:DefaultHandler,LexicalHandler, DeclHandler, EntityResolver2
+	 * @link http://www.saxproject.org/apidoc/org/xml/sax/helpers/DefaultHandler.html
+	 */
+	function DOMHandler() {
+	    this.cdata = false;
+	}
+	function position(locator,node){
+		node.lineNumber = locator.lineNumber;
+		node.columnNumber = locator.columnNumber;
+	}
+	/**
+	 * @see org.xml.sax.ContentHandler#startDocument
+	 * @link http://www.saxproject.org/apidoc/org/xml/sax/ContentHandler.html
+	 */ 
+	DOMHandler.prototype = {
+		startDocument : function() {
+	    	this.document = new DOMImplementation().createDocument(null, null, null);
+	    	if (this.locator) {
+	        	this.document.documentURI = this.locator.systemId;
+	    	}
+		},
+		startElement:function(namespaceURI, localName, qName, attrs) {
+			var doc = this.document;
+		    var el = doc.createElementNS(namespaceURI, qName||localName);
+		    var len = attrs.length;
+		    appendElement(this, el);
+		    this.currentElement = el;
+		    
+			this.locator && position(this.locator,el)
+		    for (var i = 0 ; i < len; i++) {
+		        var namespaceURI = attrs.getURI(i);
+		        var value = attrs.getValue(i);
+		        var qName = attrs.getQName(i);
+				var attr = doc.createAttributeNS(namespaceURI, qName);
+				if( attr.getOffset){
+					position(attr.getOffset(1),attr)
+				}
+				attr.value = attr.nodeValue = value;
+				el.setAttributeNode(attr)
+		    }
+		},
+		endElement:function(namespaceURI, localName, qName) {
+			var current = this.currentElement
+		    var tagName = current.tagName;
+		    this.currentElement = current.parentNode;
+		},
+		startPrefixMapping:function(prefix, uri) {
+		},
+		endPrefixMapping:function(prefix) {
+		},
+		processingInstruction:function(target, data) {
+		    var ins = this.document.createProcessingInstruction(target, data);
+		    this.locator && position(this.locator,ins)
+		    appendElement(this, ins);
+		},
+		ignorableWhitespace:function(ch, start, length) {
+		},
+		characters:function(chars, start, length) {
+			chars = _toString.apply(this,arguments)
+			//console.log(chars)
+			if(this.currentElement && chars){
+				if (this.cdata) {
+					var charNode = this.document.createCDATASection(chars);
+					this.currentElement.appendChild(charNode);
+				} else {
+					var charNode = this.document.createTextNode(chars);
+					this.currentElement.appendChild(charNode);
+				}
+				this.locator && position(this.locator,charNode)
+			}
+		},
+		skippedEntity:function(name) {
+		},
+		endDocument:function() {
+			this.document.normalize();
+		},
+		setDocumentLocator:function (locator) {
+		    if(this.locator = locator){// && !('lineNumber' in locator)){
+		    	locator.lineNumber = 0;
+		    }
+		},
+		//LexicalHandler
+		comment:function(chars, start, length) {
+			chars = _toString.apply(this,arguments)
+		    var comm = this.document.createComment(chars);
+		    this.locator && position(this.locator,comm)
+		    appendElement(this, comm);
+		},
+		
+		startCDATA:function() {
+		    //used in characters() methods
+		    this.cdata = true;
+		},
+		endCDATA:function() {
+		    this.cdata = false;
+		},
+		
+		startDTD:function(name, publicId, systemId) {
+			var impl = this.document.implementation;
+		    if (impl && impl.createDocumentType) {
+		        var dt = impl.createDocumentType(name, publicId, systemId);
+		        this.locator && position(this.locator,dt)
+		        appendElement(this, dt);
+		    }
+		},
+		/**
+		 * @see org.xml.sax.ErrorHandler
+		 * @link http://www.saxproject.org/apidoc/org/xml/sax/ErrorHandler.html
+		 */
+		warning:function(error) {
+			console.warn('[xmldom warning]\t'+error,_locator(this.locator));
+		},
+		error:function(error) {
+			console.error('[xmldom error]\t'+error,_locator(this.locator));
+		},
+		fatalError:function(error) {
+			console.error('[xmldom fatalError]\t'+error,_locator(this.locator));
+		    throw error;
+		}
+	}
+	function _locator(l){
+		if(l){
+			return '\n@'+(l.systemId ||'')+'#[line:'+l.lineNumber+',col:'+l.columnNumber+']'
+		}
+	}
+	function _toString(chars,start,length){
+		if(typeof chars == 'string'){
+			return chars.substr(start,length)
+		}else{//java sax connect width xmldom on rhino(what about: "? && !(chars instanceof String)")
+			if(chars.length >= start+length || start){
+				return new java.lang.String(chars,start,length)+'';
+			}
+			return chars;
+		}
+	}
+
+	/*
+	 * @link http://www.saxproject.org/apidoc/org/xml/sax/ext/LexicalHandler.html
+	 * used method of org.xml.sax.ext.LexicalHandler:
+	 *  #comment(chars, start, length)
+	 *  #startCDATA()
+	 *  #endCDATA()
+	 *  #startDTD(name, publicId, systemId)
+	 *
+	 *
+	 * IGNORED method of org.xml.sax.ext.LexicalHandler:
+	 *  #endDTD()
+	 *  #startEntity(name)
+	 *  #endEntity(name)
+	 *
+	 *
+	 * @link http://www.saxproject.org/apidoc/org/xml/sax/ext/DeclHandler.html
+	 * IGNORED method of org.xml.sax.ext.DeclHandler
+	 * 	#attributeDecl(eName, aName, type, mode, value)
+	 *  #elementDecl(name, model)
+	 *  #externalEntityDecl(name, publicId, systemId)
+	 *  #internalEntityDecl(name, value)
+	 * @link http://www.saxproject.org/apidoc/org/xml/sax/ext/EntityResolver2.html
+	 * IGNORED method of org.xml.sax.EntityResolver2
+	 *  #resolveEntity(String name,String publicId,String baseURI,String systemId)
+	 *  #resolveEntity(publicId, systemId)
+	 *  #getExternalSubset(name, baseURI)
+	 * @link http://www.saxproject.org/apidoc/org/xml/sax/DTDHandler.html
+	 * IGNORED method of org.xml.sax.DTDHandler
+	 *  #notationDecl(name, publicId, systemId) {};
+	 *  #unparsedEntityDecl(name, publicId, systemId, notationName) {};
+	 */
+	"endDTD,startEntity,endEntity,attributeDecl,elementDecl,externalEntityDecl,internalEntityDecl,resolveEntity,getExternalSubset,notationDecl,unparsedEntityDecl".replace(/\w+/g,function(key){
+		DOMHandler.prototype[key] = function(){return null}
+	})
+
+	/* Private static helpers treated below as private instance methods, so don't need to add these to the public API; we might use a Relator to also get rid of non-standard public properties */
+	function appendElement (hander,node) {
+	    if (!hander.currentElement) {
+	        hander.document.appendChild(node);
+	    } else {
+	        hander.currentElement.appendChild(node);
+	    }
+	}//appendChild and setAttributeNS are preformance key
+
+	if(true){
+		var XMLReader = __webpack_require__(168).XMLReader;
+		var DOMImplementation = exports.DOMImplementation = __webpack_require__(169).DOMImplementation;
+		exports.XMLSerializer = __webpack_require__(169).XMLSerializer ;
+		exports.DOMParser = DOMParser;
+	}
+
+
+/***/ },
+/* 168 */
+/***/ function(module, exports, __webpack_require__) {
+
+	//[4]   	NameStartChar	   ::=   	":" | [A-Z] | "_" | [a-z] | [#xC0-#xD6] | [#xD8-#xF6] | [#xF8-#x2FF] | [#x370-#x37D] | [#x37F-#x1FFF] | [#x200C-#x200D] | [#x2070-#x218F] | [#x2C00-#x2FEF] | [#x3001-#xD7FF] | [#xF900-#xFDCF] | [#xFDF0-#xFFFD] | [#x10000-#xEFFFF]
+	//[4a]   	NameChar	   ::=   	NameStartChar | "-" | "." | [0-9] | #xB7 | [#x0300-#x036F] | [#x203F-#x2040]
+	//[5]   	Name	   ::=   	NameStartChar (NameChar)*
+	var nameStartChar = /[A-Z_a-z\xC0-\xD6\xD8-\xF6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD]///\u10000-\uEFFFF
+	var nameChar = new RegExp("[\\-\\.0-9"+nameStartChar.source.slice(1,-1)+"\u00B7\u0300-\u036F\\u203F-\u2040]");
+	var tagNamePattern = new RegExp('^'+nameStartChar.source+nameChar.source+'*(?:\:'+nameStartChar.source+nameChar.source+'*)?$');
+	//var tagNamePattern = /^[a-zA-Z_][\w\-\.]*(?:\:[a-zA-Z_][\w\-\.]*)?$/
+	//var handlers = 'resolveEntity,getExternalSubset,characters,endDocument,endElement,endPrefixMapping,ignorableWhitespace,processingInstruction,setDocumentLocator,skippedEntity,startDocument,startElement,startPrefixMapping,notationDecl,unparsedEntityDecl,error,fatalError,warning,attributeDecl,elementDecl,externalEntityDecl,internalEntityDecl,comment,endCDATA,endDTD,endEntity,startCDATA,startDTD,startEntity'.split(',')
+
+	//S_TAG,	S_ATTR,	S_EQ,	S_V
+	//S_ATTR_S,	S_E,	S_S,	S_C
+	var S_TAG = 0;//tag name offerring
+	var S_ATTR = 1;//attr name offerring 
+	var S_ATTR_S=2;//attr name end and space offer
+	var S_EQ = 3;//=space?
+	var S_V = 4;//attr value(no quot value only)
+	var S_E = 5;//attr value end and no space(quot end)
+	var S_S = 6;//(attr value end || tag end ) && (space offer)
+	var S_C = 7;//closed el<el />
+
+	function XMLReader(){
+		
+	}
+
+	XMLReader.prototype = {
+		parse:function(source,defaultNSMap,entityMap){
+			var domBuilder = this.domBuilder;
+			domBuilder.startDocument();
+			_copy(defaultNSMap ,defaultNSMap = {})
+			parse(source,defaultNSMap,entityMap,
+					domBuilder,this.errorHandler);
+			domBuilder.endDocument();
+		}
+	}
+	function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
+	  function fixedFromCharCode(code) {
+			// String.prototype.fromCharCode does not supports
+			// > 2 bytes unicode chars directly
+			if (code > 0xffff) {
+				code -= 0x10000;
+				var surrogate1 = 0xd800 + (code >> 10)
+					, surrogate2 = 0xdc00 + (code & 0x3ff);
+
+				return String.fromCharCode(surrogate1, surrogate2);
+			} else {
+				return String.fromCharCode(code);
+			}
+		}
+		function entityReplacer(a){
+			var k = a.slice(1,-1);
+			if(k in entityMap){
+				return entityMap[k]; 
+			}else if(k.charAt(0) === '#'){
+				return fixedFromCharCode(parseInt(k.substr(1).replace('x','0x')))
+			}else{
+				errorHandler.error('entity not found:'+a);
+				return a;
+			}
+		}
+		function appendText(end){//has some bugs
+			if(end>start){
+				var xt = source.substring(start,end).replace(/&#?\w+;/g,entityReplacer);
+				locator&&position(start);
+				domBuilder.characters(xt,0,end-start);
+				start = end
+			}
+		}
+		function position(p,m){
+			while(p>=lineEnd && (m = linePattern.exec(source))){
+				lineStart = m.index;
+				lineEnd = lineStart + m[0].length;
+				locator.lineNumber++;
+				//console.log('line++:',locator,startPos,endPos)
+			}
+			locator.columnNumber = p-lineStart+1;
+		}
+		var lineStart = 0;
+		var lineEnd = 0;
+		var linePattern = /.+(?:\r\n?|\n)|.*$/g
+		var locator = domBuilder.locator;
+		
+		var parseStack = [{currentNSMap:defaultNSMapCopy}]
+		var closeMap = {};
+		var start = 0;
+		while(true){
+			try{
+				var tagStart = source.indexOf('<',start);
+				if(tagStart<0){
+					if(!source.substr(start).match(/^\s*$/)){
+						var doc = domBuilder.document;
+		    			var text = doc.createTextNode(source.substr(start));
+		    			doc.appendChild(text);
+		    			domBuilder.currentElement = text;
+					}
+					return;
+				}
+				if(tagStart>start){
+					appendText(tagStart);
+				}
+				switch(source.charAt(tagStart+1)){
+				case '/':
+					var end = source.indexOf('>',tagStart+3);
+					var tagName = source.substring(tagStart+2,end);
+					var config = parseStack.pop();
+					var localNSMap = config.localNSMap;
+			        if(config.tagName != tagName){
+			            errorHandler.fatalError("end tag name: "+tagName+' is not match the current start tagName:'+config.tagName );
+			        }
+					domBuilder.endElement(config.uri,config.localName,tagName);
+					if(localNSMap){
+						for(var prefix in localNSMap){
+							domBuilder.endPrefixMapping(prefix) ;
+						}
+					}
+					end++;
+					break;
+					// end elment
+				case '?':// <?...?>
+					locator&&position(tagStart);
+					end = parseInstruction(source,tagStart,domBuilder);
+					break;
+				case '!':// <!doctype,<![CDATA,<!--
+					locator&&position(tagStart);
+					end = parseDCC(source,tagStart,domBuilder,errorHandler);
+					break;
+				default:
+				
+					locator&&position(tagStart);
+					
+					var el = new ElementAttributes();
+					
+					//elStartEnd
+					var end = parseElementStartPart(source,tagStart,el,entityReplacer,errorHandler);
+					var len = el.length;
+					
+					if(locator){
+						if(len){
+							//attribute position fixed
+							for(var i = 0;i<len;i++){
+								var a = el[i];
+								position(a.offset);
+								a.offset = copyLocator(locator,{});
+							}
+						}
+						position(end);
+					}
+					if(!el.closed && fixSelfClosed(source,end,el.tagName,closeMap)){
+						el.closed = true;
+						if(!entityMap.nbsp){
+							errorHandler.warning('unclosed xml attribute');
+						}
+					}
+					appendElement(el,domBuilder,parseStack);
+					
+					
+					if(el.uri === 'http://www.w3.org/1999/xhtml' && !el.closed){
+						end = parseHtmlSpecialContent(source,end,el.tagName,entityReplacer,domBuilder)
+					}else{
+						end++;
+					}
+				}
+			}catch(e){
+				errorHandler.error('element parse error: '+e);
+				end = -1;
+			}
+			if(end>start){
+				start = end;
+			}else{
+				//TODO: 这里有可能sax回退，有位置错误风险
+				appendText(Math.max(tagStart,start)+1);
+			}
+		}
+	}
+	function copyLocator(f,t){
+		t.lineNumber = f.lineNumber;
+		t.columnNumber = f.columnNumber;
+		return t;
+	}
+
+	/**
+	 * @see #appendElement(source,elStartEnd,el,selfClosed,entityReplacer,domBuilder,parseStack);
+	 * @return end of the elementStartPart(end of elementEndPart for selfClosed el)
+	 */
+	function parseElementStartPart(source,start,el,entityReplacer,errorHandler){
+		var attrName;
+		var value;
+		var p = ++start;
+		var s = S_TAG;//status
+		while(true){
+			var c = source.charAt(p);
+			switch(c){
+			case '=':
+				if(s === S_ATTR){//attrName
+					attrName = source.slice(start,p);
+					s = S_EQ;
+				}else if(s === S_ATTR_S){
+					s = S_EQ;
+				}else{
+					//fatalError: equal must after attrName or space after attrName
+					throw new Error('attribute equal must after attrName');
+				}
+				break;
+			case '\'':
+			case '"':
+				if(s === S_EQ){//equal
+					start = p+1;
+					p = source.indexOf(c,start)
+					if(p>0){
+						value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
+						el.add(attrName,value,start-1);
+						s = S_E;
+					}else{
+						//fatalError: no end quot match
+						throw new Error('attribute value no end \''+c+'\' match');
+					}
+				}else if(s == S_V){
+					value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
+					//console.log(attrName,value,start,p)
+					el.add(attrName,value,start);
+					//console.dir(el)
+					errorHandler.warning('attribute "'+attrName+'" missed start quot('+c+')!!');
+					start = p+1;
+					s = S_E
+				}else{
+					//fatalError: no equal before
+					throw new Error('attribute value must after "="');
+				}
+				break;
+			case '/':
+				switch(s){
+				case S_TAG:
+					el.setTagName(source.slice(start,p));
+				case S_E:
+				case S_S:
+				case S_C:
+					s = S_C;
+					el.closed = true;
+				case S_V:
+				case S_ATTR:
+				case S_ATTR_S:
+					break;
+				//case S_EQ:
+				default:
+					throw new Error("attribute invalid close char('/')")
+				}
+				break;
+			case ''://end document
+				//throw new Error('unexpected end of input')
+				errorHandler.error('unexpected end of input');
+			case '>':
+				switch(s){
+				case S_TAG:
+					el.setTagName(source.slice(start,p));
+				case S_E:
+				case S_S:
+				case S_C:
+					break;//normal
+				case S_V://Compatible state
+				case S_ATTR:
+					value = source.slice(start,p);
+					if(value.slice(-1) === '/'){
+						el.closed  = true;
+						value = value.slice(0,-1)
+					}
+				case S_ATTR_S:
+					if(s === S_ATTR_S){
+						value = attrName;
+					}
+					if(s == S_V){
+						errorHandler.warning('attribute "'+value+'" missed quot(")!!');
+						el.add(attrName,value.replace(/&#?\w+;/g,entityReplacer),start)
+					}else{
+						errorHandler.warning('attribute "'+value+'" missed value!! "'+value+'" instead!!')
+						el.add(value,value,start)
+					}
+					break;
+				case S_EQ:
+					throw new Error('attribute value missed!!');
+				}
+	//			console.log(tagName,tagNamePattern,tagNamePattern.test(tagName))
+				return p;
+			/*xml space '\x20' | #x9 | #xD | #xA; */
+			case '\u0080':
+				c = ' ';
+			default:
+				if(c<= ' '){//space
+					switch(s){
+					case S_TAG:
+						el.setTagName(source.slice(start,p));//tagName
+						s = S_S;
+						break;
+					case S_ATTR:
+						attrName = source.slice(start,p)
+						s = S_ATTR_S;
+						break;
+					case S_V:
+						var value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
+						errorHandler.warning('attribute "'+value+'" missed quot(")!!');
+						el.add(attrName,value,start)
+					case S_E:
+						s = S_S;
+						break;
+					//case S_S:
+					//case S_EQ:
+					//case S_ATTR_S:
+					//	void();break;
+					//case S_C:
+						//ignore warning
+					}
+				}else{//not space
+	//S_TAG,	S_ATTR,	S_EQ,	S_V
+	//S_ATTR_S,	S_E,	S_S,	S_C
+					switch(s){
+					//case S_TAG:void();break;
+					//case S_ATTR:void();break;
+					//case S_V:void();break;
+					case S_ATTR_S:
+						errorHandler.warning('attribute "'+attrName+'" missed value!! "'+attrName+'" instead!!')
+						el.add(attrName,attrName,start);
+						start = p;
+						s = S_ATTR;
+						break;
+					case S_E:
+						errorHandler.warning('attribute space is required"'+attrName+'"!!')
+					case S_S:
+						s = S_ATTR;
+						start = p;
+						break;
+					case S_EQ:
+						s = S_V;
+						start = p;
+						break;
+					case S_C:
+						throw new Error("elements closed character '/' and '>' must be connected to");
+					}
+				}
+			}
+			p++;
+		}
+	}
+	/**
+	 * @return end of the elementStartPart(end of elementEndPart for selfClosed el)
+	 */
+	function appendElement(el,domBuilder,parseStack){
+		var tagName = el.tagName;
+		var localNSMap = null;
+		var currentNSMap = parseStack[parseStack.length-1].currentNSMap;
+		var i = el.length;
+		while(i--){
+			var a = el[i];
+			var qName = a.qName;
+			var value = a.value;
+			var nsp = qName.indexOf(':');
+			if(nsp>0){
+				var prefix = a.prefix = qName.slice(0,nsp);
+				var localName = qName.slice(nsp+1);
+				var nsPrefix = prefix === 'xmlns' && localName
+			}else{
+				localName = qName;
+				prefix = null
+				nsPrefix = qName === 'xmlns' && ''
+			}
+			//can not set prefix,because prefix !== ''
+			a.localName = localName ;
+			//prefix == null for no ns prefix attribute 
+			if(nsPrefix !== false){//hack!!
+				if(localNSMap == null){
+					localNSMap = {}
+					//console.log(currentNSMap,0)
+					_copy(currentNSMap,currentNSMap={})
+					//console.log(currentNSMap,1)
+				}
+				currentNSMap[nsPrefix] = localNSMap[nsPrefix] = value;
+				a.uri = 'http://www.w3.org/2000/xmlns/'
+				domBuilder.startPrefixMapping(nsPrefix, value) 
+			}
+		}
+		var i = el.length;
+		while(i--){
+			a = el[i];
+			var prefix = a.prefix;
+			if(prefix){//no prefix attribute has no namespace
+				if(prefix === 'xml'){
+					a.uri = 'http://www.w3.org/XML/1998/namespace';
+				}if(prefix !== 'xmlns'){
+					a.uri = currentNSMap[prefix]
+					
+					//{console.log('###'+a.qName,domBuilder.locator.systemId+'',currentNSMap,a.uri)}
+				}
+			}
+		}
+		var nsp = tagName.indexOf(':');
+		if(nsp>0){
+			prefix = el.prefix = tagName.slice(0,nsp);
+			localName = el.localName = tagName.slice(nsp+1);
+		}else{
+			prefix = null;//important!!
+			localName = el.localName = tagName;
+		}
+		//no prefix element has default namespace
+		var ns = el.uri = currentNSMap[prefix || ''];
+		domBuilder.startElement(ns,localName,tagName,el);
+		//endPrefixMapping and startPrefixMapping have not any help for dom builder
+		//localNSMap = null
+		if(el.closed){
+			domBuilder.endElement(ns,localName,tagName);
+			if(localNSMap){
+				for(prefix in localNSMap){
+					domBuilder.endPrefixMapping(prefix) 
+				}
+			}
+		}else{
+			el.currentNSMap = currentNSMap;
+			el.localNSMap = localNSMap;
+			parseStack.push(el);
+		}
+	}
+	function parseHtmlSpecialContent(source,elStartEnd,tagName,entityReplacer,domBuilder){
+		if(/^(?:script|textarea)$/i.test(tagName)){
+			var elEndStart =  source.indexOf('</'+tagName+'>',elStartEnd);
+			var text = source.substring(elStartEnd+1,elEndStart);
+			if(/[&<]/.test(text)){
+				if(/^script$/i.test(tagName)){
+					//if(!/\]\]>/.test(text)){
+						//lexHandler.startCDATA();
+						domBuilder.characters(text,0,text.length);
+						//lexHandler.endCDATA();
+						return elEndStart;
+					//}
+				}//}else{//text area
+					text = text.replace(/&#?\w+;/g,entityReplacer);
+					domBuilder.characters(text,0,text.length);
+					return elEndStart;
+				//}
+				
+			}
+		}
+		return elStartEnd+1;
+	}
+	function fixSelfClosed(source,elStartEnd,tagName,closeMap){
+		//if(tagName in closeMap){
+		var pos = closeMap[tagName];
+		if(pos == null){
+			//console.log(tagName)
+			pos = closeMap[tagName] = source.lastIndexOf('</'+tagName+'>')
+		}
+		return pos<elStartEnd;
+		//} 
+	}
+	function _copy(source,target){
+		for(var n in source){target[n] = source[n]}
+	}
+	function parseDCC(source,start,domBuilder,errorHandler){//sure start with '<!'
+		var next= source.charAt(start+2)
+		switch(next){
+		case '-':
+			if(source.charAt(start + 3) === '-'){
+				var end = source.indexOf('-->',start+4);
+				//append comment source.substring(4,end)//<!--
+				if(end>start){
+					domBuilder.comment(source,start+4,end-start-4);
+					return end+3;
+				}else{
+					errorHandler.error("Unclosed comment");
+					return -1;
+				}
+			}else{
+				//error
+				return -1;
+			}
+		default:
+			if(source.substr(start+3,6) == 'CDATA['){
+				var end = source.indexOf(']]>',start+9);
+				domBuilder.startCDATA();
+				domBuilder.characters(source,start+9,end-start-9);
+				domBuilder.endCDATA() 
+				return end+3;
+			}
+			//<!DOCTYPE
+			//startDTD(java.lang.String name, java.lang.String publicId, java.lang.String systemId) 
+			var matchs = split(source,start);
+			var len = matchs.length;
+			if(len>1 && /!doctype/i.test(matchs[0][0])){
+				var name = matchs[1][0];
+				var pubid = len>3 && /^public$/i.test(matchs[2][0]) && matchs[3][0]
+				var sysid = len>4 && matchs[4][0];
+				var lastMatch = matchs[len-1]
+				domBuilder.startDTD(name,pubid && pubid.replace(/^(['"])(.*?)\1$/,'$2'),
+						sysid && sysid.replace(/^(['"])(.*?)\1$/,'$2'));
+				domBuilder.endDTD();
+				
+				return lastMatch.index+lastMatch[0].length
+			}
+		}
+		return -1;
+	}
+
+
+
+	function parseInstruction(source,start,domBuilder){
+		var end = source.indexOf('?>',start);
+		if(end){
+			var match = source.substring(start,end).match(/^<\?(\S*)\s*([\s\S]*?)\s*$/);
+			if(match){
+				var len = match[0].length;
+				domBuilder.processingInstruction(match[1], match[2]) ;
+				return end+2;
+			}else{//error
+				return -1;
+			}
+		}
+		return -1;
+	}
+
+	/**
+	 * @param source
+	 */
+	function ElementAttributes(source){
+		
+	}
+	ElementAttributes.prototype = {
+		setTagName:function(tagName){
+			if(!tagNamePattern.test(tagName)){
+				throw new Error('invalid tagName:'+tagName)
+			}
+			this.tagName = tagName
+		},
+		add:function(qName,value,offset){
+			if(!tagNamePattern.test(qName)){
+				throw new Error('invalid attribute:'+qName)
+			}
+			this[this.length++] = {qName:qName,value:value,offset:offset}
+		},
+		length:0,
+		getLocalName:function(i){return this[i].localName},
+		getOffset:function(i){return this[i].offset},
+		getQName:function(i){return this[i].qName},
+		getURI:function(i){return this[i].uri},
+		getValue:function(i){return this[i].value}
+	//	,getIndex:function(uri, localName)){
+	//		if(localName){
+	//			
+	//		}else{
+	//			var qName = uri
+	//		}
+	//	},
+	//	getValue:function(){return this.getValue(this.getIndex.apply(this,arguments))},
+	//	getType:function(uri,localName){}
+	//	getType:function(i){},
+	}
+
+
+
+
+	function _set_proto_(thiz,parent){
+		thiz.__proto__ = parent;
+		return thiz;
+	}
+	if(!(_set_proto_({},_set_proto_.prototype) instanceof _set_proto_)){
+		_set_proto_ = function(thiz,parent){
+			function p(){};
+			p.prototype = parent;
+			p = new p();
+			for(parent in thiz){
+				p[parent] = thiz[parent];
+			}
+			return p;
+		}
+	}
+
+	function split(source,start){
+		var match;
+		var buf = [];
+		var reg = /'[^']+'|"[^"]+"|[^\s<>\/=]+=?|(\/?\s*>|<)/g;
+		reg.lastIndex = start;
+		reg.exec(source);//skip <
+		while(match = reg.exec(source)){
+			buf.push(match);
+			if(match[1])return buf;
+		}
+	}
+
+	if(true){
+		exports.XMLReader = XMLReader;
+	}
+
+
+
+/***/ },
+/* 169 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/*
+	 * DOM Level 2
+	 * Object DOMException
+	 * @see http://www.w3.org/TR/REC-DOM-Level-1/ecma-script-language-binding.html
+	 * @see http://www.w3.org/TR/2000/REC-DOM-Level-2-Core-20001113/ecma-script-binding.html
+	 */
+
+	function copy(src,dest){
+		for(var p in src){
+			dest[p] = src[p];
+		}
+	}
+	/**
+	^\w+\.prototype\.([_\w]+)\s*=\s*((?:.*\{\s*?[\r\n][\s\S]*?^})|\S.*?(?=[;\r\n]));?
+	^\w+\.prototype\.([_\w]+)\s*=\s*(\S.*?(?=[;\r\n]));?
+	 */
+	function _extends(Class,Super){
+		var pt = Class.prototype;
+		if(Object.create){
+			var ppt = Object.create(Super.prototype)
+			pt.__proto__ = ppt;
+		}
+		if(!(pt instanceof Super)){
+			function t(){};
+			t.prototype = Super.prototype;
+			t = new t();
+			copy(pt,t);
+			Class.prototype = pt = t;
+		}
+		if(pt.constructor != Class){
+			if(typeof Class != 'function'){
+				console.error("unknow Class:"+Class)
+			}
+			pt.constructor = Class
+		}
+	}
+	var htmlns = 'http://www.w3.org/1999/xhtml' ;
+	// Node Types
+	var NodeType = {}
+	var ELEMENT_NODE                = NodeType.ELEMENT_NODE                = 1;
+	var ATTRIBUTE_NODE              = NodeType.ATTRIBUTE_NODE              = 2;
+	var TEXT_NODE                   = NodeType.TEXT_NODE                   = 3;
+	var CDATA_SECTION_NODE          = NodeType.CDATA_SECTION_NODE          = 4;
+	var ENTITY_REFERENCE_NODE       = NodeType.ENTITY_REFERENCE_NODE       = 5;
+	var ENTITY_NODE                 = NodeType.ENTITY_NODE                 = 6;
+	var PROCESSING_INSTRUCTION_NODE = NodeType.PROCESSING_INSTRUCTION_NODE = 7;
+	var COMMENT_NODE                = NodeType.COMMENT_NODE                = 8;
+	var DOCUMENT_NODE               = NodeType.DOCUMENT_NODE               = 9;
+	var DOCUMENT_TYPE_NODE          = NodeType.DOCUMENT_TYPE_NODE          = 10;
+	var DOCUMENT_FRAGMENT_NODE      = NodeType.DOCUMENT_FRAGMENT_NODE      = 11;
+	var NOTATION_NODE               = NodeType.NOTATION_NODE               = 12;
+
+	// ExceptionCode
+	var ExceptionCode = {}
+	var ExceptionMessage = {};
+	var INDEX_SIZE_ERR              = ExceptionCode.INDEX_SIZE_ERR              = ((ExceptionMessage[1]="Index size error"),1);
+	var DOMSTRING_SIZE_ERR          = ExceptionCode.DOMSTRING_SIZE_ERR          = ((ExceptionMessage[2]="DOMString size error"),2);
+	var HIERARCHY_REQUEST_ERR       = ExceptionCode.HIERARCHY_REQUEST_ERR       = ((ExceptionMessage[3]="Hierarchy request error"),3);
+	var WRONG_DOCUMENT_ERR          = ExceptionCode.WRONG_DOCUMENT_ERR          = ((ExceptionMessage[4]="Wrong document"),4);
+	var INVALID_CHARACTER_ERR       = ExceptionCode.INVALID_CHARACTER_ERR       = ((ExceptionMessage[5]="Invalid character"),5);
+	var NO_DATA_ALLOWED_ERR         = ExceptionCode.NO_DATA_ALLOWED_ERR         = ((ExceptionMessage[6]="No data allowed"),6);
+	var NO_MODIFICATION_ALLOWED_ERR = ExceptionCode.NO_MODIFICATION_ALLOWED_ERR = ((ExceptionMessage[7]="No modification allowed"),7);
+	var NOT_FOUND_ERR               = ExceptionCode.NOT_FOUND_ERR               = ((ExceptionMessage[8]="Not found"),8);
+	var NOT_SUPPORTED_ERR           = ExceptionCode.NOT_SUPPORTED_ERR           = ((ExceptionMessage[9]="Not supported"),9);
+	var INUSE_ATTRIBUTE_ERR         = ExceptionCode.INUSE_ATTRIBUTE_ERR         = ((ExceptionMessage[10]="Attribute in use"),10);
+	//level2
+	var INVALID_STATE_ERR        	= ExceptionCode.INVALID_STATE_ERR        	= ((ExceptionMessage[11]="Invalid state"),11);
+	var SYNTAX_ERR               	= ExceptionCode.SYNTAX_ERR               	= ((ExceptionMessage[12]="Syntax error"),12);
+	var INVALID_MODIFICATION_ERR 	= ExceptionCode.INVALID_MODIFICATION_ERR 	= ((ExceptionMessage[13]="Invalid modification"),13);
+	var NAMESPACE_ERR            	= ExceptionCode.NAMESPACE_ERR           	= ((ExceptionMessage[14]="Invalid namespace"),14);
+	var INVALID_ACCESS_ERR       	= ExceptionCode.INVALID_ACCESS_ERR      	= ((ExceptionMessage[15]="Invalid access"),15);
+
+
+	function DOMException(code, message) {
+		if(message instanceof Error){
+			var error = message;
+		}else{
+			error = this;
+			Error.call(this, ExceptionMessage[code]);
+			this.message = ExceptionMessage[code];
+			if(Error.captureStackTrace) Error.captureStackTrace(this, DOMException);
+		}
+		error.code = code;
+		if(message) this.message = this.message + ": " + message;
+		return error;
+	};
+	DOMException.prototype = Error.prototype;
+	copy(ExceptionCode,DOMException)
+	/**
+	 * @see http://www.w3.org/TR/2000/REC-DOM-Level-2-Core-20001113/core.html#ID-536297177
+	 * The NodeList interface provides the abstraction of an ordered collection of nodes, without defining or constraining how this collection is implemented. NodeList objects in the DOM are live.
+	 * The items in the NodeList are accessible via an integral index, starting from 0.
+	 */
+	function NodeList() {
+	};
+	NodeList.prototype = {
+		/**
+		 * The number of nodes in the list. The range of valid child node indices is 0 to length-1 inclusive.
+		 * @standard level1
+		 */
+		length:0, 
+		/**
+		 * Returns the indexth item in the collection. If index is greater than or equal to the number of nodes in the list, this returns null.
+		 * @standard level1
+		 * @param index  unsigned long 
+		 *   Index into the collection.
+		 * @return Node
+		 * 	The node at the indexth position in the NodeList, or null if that is not a valid index. 
+		 */
+		item: function(index) {
+			return this[index] || null;
+		},
+		toString:function(){
+			for(var buf = [], i = 0;i<this.length;i++){
+				serializeToString(this[i],buf);
+			}
+			return buf.join('');
+		}
+	};
+	function LiveNodeList(node,refresh){
+		this._node = node;
+		this._refresh = refresh
+		_updateLiveList(this);
+	}
+	function _updateLiveList(list){
+		var inc = list._node._inc || list._node.ownerDocument._inc;
+		if(list._inc != inc){
+			var ls = list._refresh(list._node);
+			//console.log(ls.length)
+			__set__(list,'length',ls.length);
+			copy(ls,list);
+			list._inc = inc;
+		}
+	}
+	LiveNodeList.prototype.item = function(i){
+		_updateLiveList(this);
+		return this[i];
+	}
+
+	_extends(LiveNodeList,NodeList);
+	/**
+	 * 
+	 * Objects implementing the NamedNodeMap interface are used to represent collections of nodes that can be accessed by name. Note that NamedNodeMap does not inherit from NodeList; NamedNodeMaps are not maintained in any particular order. Objects contained in an object implementing NamedNodeMap may also be accessed by an ordinal index, but this is simply to allow convenient enumeration of the contents of a NamedNodeMap, and does not imply that the DOM specifies an order to these Nodes.
+	 * NamedNodeMap objects in the DOM are live.
+	 * used for attributes or DocumentType entities 
+	 */
+	function NamedNodeMap() {
+	};
+
+	function _findNodeIndex(list,node){
+		var i = list.length;
+		while(i--){
+			if(list[i] === node){return i}
+		}
+	}
+
+	function _addNamedNode(el,list,newAttr,oldAttr){
+		if(oldAttr){
+			list[_findNodeIndex(list,oldAttr)] = newAttr;
+		}else{
+			list[list.length++] = newAttr;
+		}
+		if(el){
+			newAttr.ownerElement = el;
+			var doc = el.ownerDocument;
+			if(doc){
+				oldAttr && _onRemoveAttribute(doc,el,oldAttr);
+				_onAddAttribute(doc,el,newAttr);
+			}
+		}
+	}
+	function _removeNamedNode(el,list,attr){
+		var i = _findNodeIndex(list,attr);
+		if(i>=0){
+			var lastIndex = list.length-1
+			while(i<lastIndex){
+				list[i] = list[++i]
+			}
+			list.length = lastIndex;
+			if(el){
+				var doc = el.ownerDocument;
+				if(doc){
+					_onRemoveAttribute(doc,el,attr);
+					attr.ownerElement = null;
+				}
+			}
+		}else{
+			throw DOMException(NOT_FOUND_ERR,new Error())
+		}
+	}
+	NamedNodeMap.prototype = {
+		length:0,
+		item:NodeList.prototype.item,
+		getNamedItem: function(key) {
+	//		if(key.indexOf(':')>0 || key == 'xmlns'){
+	//			return null;
+	//		}
+			var i = this.length;
+			while(i--){
+				var attr = this[i];
+				if(attr.nodeName == key){
+					return attr;
+				}
+			}
+		},
+		setNamedItem: function(attr) {
+			var el = attr.ownerElement;
+			if(el && el!=this._ownerElement){
+				throw new DOMException(INUSE_ATTRIBUTE_ERR);
+			}
+			var oldAttr = this.getNamedItem(attr.nodeName);
+			_addNamedNode(this._ownerElement,this,attr,oldAttr);
+			return oldAttr;
+		},
+		/* returns Node */
+		setNamedItemNS: function(attr) {// raises: WRONG_DOCUMENT_ERR,NO_MODIFICATION_ALLOWED_ERR,INUSE_ATTRIBUTE_ERR
+			var el = attr.ownerElement, oldAttr;
+			if(el && el!=this._ownerElement){
+				throw new DOMException(INUSE_ATTRIBUTE_ERR);
+			}
+			oldAttr = this.getNamedItemNS(attr.namespaceURI,attr.localName);
+			_addNamedNode(this._ownerElement,this,attr,oldAttr);
+			return oldAttr;
+		},
+
+		/* returns Node */
+		removeNamedItem: function(key) {
+			var attr = this.getNamedItem(key);
+			_removeNamedNode(this._ownerElement,this,attr);
+			return attr;
+			
+			
+		},// raises: NOT_FOUND_ERR,NO_MODIFICATION_ALLOWED_ERR
+		
+		//for level2
+		removeNamedItemNS:function(namespaceURI,localName){
+			var attr = this.getNamedItemNS(namespaceURI,localName);
+			_removeNamedNode(this._ownerElement,this,attr);
+			return attr;
+		},
+		getNamedItemNS: function(namespaceURI, localName) {
+			var i = this.length;
+			while(i--){
+				var node = this[i];
+				if(node.localName == localName && node.namespaceURI == namespaceURI){
+					return node;
+				}
+			}
+			return null;
+		}
+	};
+	/**
+	 * @see http://www.w3.org/TR/REC-DOM-Level-1/level-one-core.html#ID-102161490
+	 */
+	function DOMImplementation(/* Object */ features) {
+		this._features = {};
+		if (features) {
+			for (var feature in features) {
+				 this._features = features[feature];
+			}
+		}
+	};
+
+	DOMImplementation.prototype = {
+		hasFeature: function(/* string */ feature, /* string */ version) {
+			var versions = this._features[feature.toLowerCase()];
+			if (versions && (!version || version in versions)) {
+				return true;
+			} else {
+				return false;
+			}
+		},
+		// Introduced in DOM Level 2:
+		createDocument:function(namespaceURI,  qualifiedName, doctype){// raises:INVALID_CHARACTER_ERR,NAMESPACE_ERR,WRONG_DOCUMENT_ERR
+			var doc = new Document();
+			doc.implementation = this;
+			doc.childNodes = new NodeList();
+			doc.doctype = doctype;
+			if(doctype){
+				doc.appendChild(doctype);
+			}
+			if(qualifiedName){
+				var root = doc.createElementNS(namespaceURI,qualifiedName);
+				doc.appendChild(root);
+			}
+			return doc;
+		},
+		// Introduced in DOM Level 2:
+		createDocumentType:function(qualifiedName, publicId, systemId){// raises:INVALID_CHARACTER_ERR,NAMESPACE_ERR
+			var node = new DocumentType();
+			node.name = qualifiedName;
+			node.nodeName = qualifiedName;
+			node.publicId = publicId;
+			node.systemId = systemId;
+			// Introduced in DOM Level 2:
+			//readonly attribute DOMString        internalSubset;
+			
+			//TODO:..
+			//  readonly attribute NamedNodeMap     entities;
+			//  readonly attribute NamedNodeMap     notations;
+			return node;
+		}
+	};
+
+
+	/**
+	 * @see http://www.w3.org/TR/2000/REC-DOM-Level-2-Core-20001113/core.html#ID-1950641247
+	 */
+
+	function Node() {
+	};
+
+	Node.prototype = {
+		firstChild : null,
+		lastChild : null,
+		previousSibling : null,
+		nextSibling : null,
+		attributes : null,
+		parentNode : null,
+		childNodes : null,
+		ownerDocument : null,
+		nodeValue : null,
+		namespaceURI : null,
+		prefix : null,
+		localName : null,
+		// Modified in DOM Level 2:
+		insertBefore:function(newChild, refChild){//raises 
+			return _insertBefore(this,newChild,refChild);
+		},
+		replaceChild:function(newChild, oldChild){//raises 
+			this.insertBefore(newChild,oldChild);
+			if(oldChild){
+				this.removeChild(oldChild);
+			}
+		},
+		removeChild:function(oldChild){
+			return _removeChild(this,oldChild);
+		},
+		appendChild:function(newChild){
+			return this.insertBefore(newChild,null);
+		},
+		hasChildNodes:function(){
+			return this.firstChild != null;
+		},
+		cloneNode:function(deep){
+			return cloneNode(this.ownerDocument||this,this,deep);
+		},
+		// Modified in DOM Level 2:
+		normalize:function(){
+			var child = this.firstChild;
+			while(child){
+				var next = child.nextSibling;
+				if(next && next.nodeType == TEXT_NODE && child.nodeType == TEXT_NODE){
+					this.removeChild(next);
+					child.appendData(next.data);
+				}else{
+					child.normalize();
+					child = next;
+				}
+			}
+		},
+	  	// Introduced in DOM Level 2:
+		isSupported:function(feature, version){
+			return this.ownerDocument.implementation.hasFeature(feature,version);
+		},
+	    // Introduced in DOM Level 2:
+	    hasAttributes:function(){
+	    	return this.attributes.length>0;
+	    },
+	    lookupPrefix:function(namespaceURI){
+	    	var el = this;
+	    	while(el){
+	    		var map = el._nsMap;
+	    		//console.dir(map)
+	    		if(map){
+	    			for(var n in map){
+	    				if(map[n] == namespaceURI){
+	    					return n;
+	    				}
+	    			}
+	    		}
+	    		el = el.nodeType == 2?el.ownerDocument : el.parentNode;
+	    	}
+	    	return null;
+	    },
+	    // Introduced in DOM Level 3:
+	    lookupNamespaceURI:function(prefix){
+	    	var el = this;
+	    	while(el){
+	    		var map = el._nsMap;
+	    		//console.dir(map)
+	    		if(map){
+	    			if(prefix in map){
+	    				return map[prefix] ;
+	    			}
+	    		}
+	    		el = el.nodeType == 2?el.ownerDocument : el.parentNode;
+	    	}
+	    	return null;
+	    },
+	    // Introduced in DOM Level 3:
+	    isDefaultNamespace:function(namespaceURI){
+	    	var prefix = this.lookupPrefix(namespaceURI);
+	    	return prefix == null;
+	    }
+	};
+
+
+	function _xmlEncoder(c){
+		return c == '<' && '&lt;' ||
+	         c == '>' && '&gt;' ||
+	         c == '&' && '&amp;' ||
+	         c == '"' && '&quot;' ||
+	         '&#'+c.charCodeAt()+';'
+	}
+
+
+	copy(NodeType,Node);
+	copy(NodeType,Node.prototype);
+
+	/**
+	 * @param callback return true for continue,false for break
+	 * @return boolean true: break visit;
+	 */
+	function _visitNode(node,callback){
+		if(callback(node)){
+			return true;
+		}
+		if(node = node.firstChild){
+			do{
+				if(_visitNode(node,callback)){return true}
+	        }while(node=node.nextSibling)
+	    }
+	}
+
+
+
+	function Document(){
+	}
+	function _onAddAttribute(doc,el,newAttr){
+		doc && doc._inc++;
+		var ns = newAttr.namespaceURI ;
+		if(ns == 'http://www.w3.org/2000/xmlns/'){
+			//update namespace
+			el._nsMap[newAttr.prefix?newAttr.localName:''] = newAttr.value
+		}
+	}
+	function _onRemoveAttribute(doc,el,newAttr,remove){
+		doc && doc._inc++;
+		var ns = newAttr.namespaceURI ;
+		if(ns == 'http://www.w3.org/2000/xmlns/'){
+			//update namespace
+			delete el._nsMap[newAttr.prefix?newAttr.localName:'']
+		}
+	}
+	function _onUpdateChild(doc,el,newChild){
+		if(doc && doc._inc){
+			doc._inc++;
+			//update childNodes
+			var cs = el.childNodes;
+			if(newChild){
+				cs[cs.length++] = newChild;
+			}else{
+				//console.log(1)
+				var child = el.firstChild;
+				var i = 0;
+				while(child){
+					cs[i++] = child;
+					child =child.nextSibling;
+				}
+				cs.length = i;
+			}
+		}
+	}
+
+	/**
+	 * attributes;
+	 * children;
+	 * 
+	 * writeable properties:
+	 * nodeValue,Attr:value,CharacterData:data
+	 * prefix
+	 */
+	function _removeChild(parentNode,child){
+		var previous = child.previousSibling;
+		var next = child.nextSibling;
+		if(previous){
+			previous.nextSibling = next;
+		}else{
+			parentNode.firstChild = next
+		}
+		if(next){
+			next.previousSibling = previous;
+		}else{
+			parentNode.lastChild = previous;
+		}
+		_onUpdateChild(parentNode.ownerDocument,parentNode);
+		return child;
+	}
+	/**
+	 * preformance key(refChild == null)
+	 */
+	function _insertBefore(parentNode,newChild,nextChild){
+		var cp = newChild.parentNode;
+		if(cp){
+			cp.removeChild(newChild);//remove and update
+		}
+		if(newChild.nodeType === DOCUMENT_FRAGMENT_NODE){
+			var newFirst = newChild.firstChild;
+			if (newFirst == null) {
+				return newChild;
+			}
+			var newLast = newChild.lastChild;
+		}else{
+			newFirst = newLast = newChild;
+		}
+		var pre = nextChild ? nextChild.previousSibling : parentNode.lastChild;
+
+		newFirst.previousSibling = pre;
+		newLast.nextSibling = nextChild;
+		
+		
+		if(pre){
+			pre.nextSibling = newFirst;
+		}else{
+			parentNode.firstChild = newFirst;
+		}
+		if(nextChild == null){
+			parentNode.lastChild = newLast;
+		}else{
+			nextChild.previousSibling = newLast;
+		}
+		do{
+			newFirst.parentNode = parentNode;
+		}while(newFirst !== newLast && (newFirst= newFirst.nextSibling))
+		_onUpdateChild(parentNode.ownerDocument||parentNode,parentNode);
+		//console.log(parentNode.lastChild.nextSibling == null)
+		if (newChild.nodeType == DOCUMENT_FRAGMENT_NODE) {
+			newChild.firstChild = newChild.lastChild = null;
+		}
+		return newChild;
+	}
+	function _appendSingleChild(parentNode,newChild){
+		var cp = newChild.parentNode;
+		if(cp){
+			var pre = parentNode.lastChild;
+			cp.removeChild(newChild);//remove and update
+			var pre = parentNode.lastChild;
+		}
+		var pre = parentNode.lastChild;
+		newChild.parentNode = parentNode;
+		newChild.previousSibling = pre;
+		newChild.nextSibling = null;
+		if(pre){
+			pre.nextSibling = newChild;
+		}else{
+			parentNode.firstChild = newChild;
+		}
+		parentNode.lastChild = newChild;
+		_onUpdateChild(parentNode.ownerDocument,parentNode,newChild);
+		return newChild;
+		//console.log("__aa",parentNode.lastChild.nextSibling == null)
+	}
+	Document.prototype = {
+		//implementation : null,
+		nodeName :  '#document',
+		nodeType :  DOCUMENT_NODE,
+		doctype :  null,
+		documentElement :  null,
+		_inc : 1,
+		
+		insertBefore :  function(newChild, refChild){//raises 
+			if(newChild.nodeType == DOCUMENT_FRAGMENT_NODE){
+				var child = newChild.firstChild;
+				while(child){
+					var next = child.nextSibling;
+					this.insertBefore(child,refChild);
+					child = next;
+				}
+				return newChild;
+			}
+			if(this.documentElement == null && newChild.nodeType == 1){
+				this.documentElement = newChild;
+			}
+			
+			return _insertBefore(this,newChild,refChild),(newChild.ownerDocument = this),newChild;
+		},
+		removeChild :  function(oldChild){
+			if(this.documentElement == oldChild){
+				this.documentElement = null;
+			}
+			return _removeChild(this,oldChild);
+		},
+		// Introduced in DOM Level 2:
+		importNode : function(importedNode,deep){
+			return importNode(this,importedNode,deep);
+		},
+		// Introduced in DOM Level 2:
+		getElementById :	function(id){
+			var rtv = null;
+			_visitNode(this.documentElement,function(node){
+				if(node.nodeType == 1){
+					if(node.getAttribute('id') == id){
+						rtv = node;
+						return true;
+					}
+				}
+			})
+			return rtv;
+		},
+		
+		//document factory method:
+		createElement :	function(tagName){
+			var node = new Element();
+			node.ownerDocument = this;
+			node.nodeName = tagName;
+			node.tagName = tagName;
+			node.childNodes = new NodeList();
+			var attrs	= node.attributes = new NamedNodeMap();
+			attrs._ownerElement = node;
+			return node;
+		},
+		createDocumentFragment :	function(){
+			var node = new DocumentFragment();
+			node.ownerDocument = this;
+			node.childNodes = new NodeList();
+			return node;
+		},
+		createTextNode :	function(data){
+			var node = new Text();
+			node.ownerDocument = this;
+			node.appendData(data)
+			return node;
+		},
+		createComment :	function(data){
+			var node = new Comment();
+			node.ownerDocument = this;
+			node.appendData(data)
+			return node;
+		},
+		createCDATASection :	function(data){
+			var node = new CDATASection();
+			node.ownerDocument = this;
+			node.appendData(data)
+			return node;
+		},
+		createProcessingInstruction :	function(target,data){
+			var node = new ProcessingInstruction();
+			node.ownerDocument = this;
+			node.tagName = node.target = target;
+			node.nodeValue= node.data = data;
+			return node;
+		},
+		createAttribute :	function(name){
+			var node = new Attr();
+			node.ownerDocument	= this;
+			node.name = name;
+			node.nodeName	= name;
+			node.localName = name;
+			node.specified = true;
+			return node;
+		},
+		createEntityReference :	function(name){
+			var node = new EntityReference();
+			node.ownerDocument	= this;
+			node.nodeName	= name;
+			return node;
+		},
+		// Introduced in DOM Level 2:
+		createElementNS :	function(namespaceURI,qualifiedName){
+			var node = new Element();
+			var pl = qualifiedName.split(':');
+			var attrs	= node.attributes = new NamedNodeMap();
+			node.childNodes = new NodeList();
+			node.ownerDocument = this;
+			node.nodeName = qualifiedName;
+			node.tagName = qualifiedName;
+			node.namespaceURI = namespaceURI;
+			if(pl.length == 2){
+				node.prefix = pl[0];
+				node.localName = pl[1];
+			}else{
+				//el.prefix = null;
+				node.localName = qualifiedName;
+			}
+			attrs._ownerElement = node;
+			return node;
+		},
+		// Introduced in DOM Level 2:
+		createAttributeNS :	function(namespaceURI,qualifiedName){
+			var node = new Attr();
+			var pl = qualifiedName.split(':');
+			node.ownerDocument = this;
+			node.nodeName = qualifiedName;
+			node.name = qualifiedName;
+			node.namespaceURI = namespaceURI;
+			node.specified = true;
+			if(pl.length == 2){
+				node.prefix = pl[0];
+				node.localName = pl[1];
+			}else{
+				//el.prefix = null;
+				node.localName = qualifiedName;
+			}
+			return node;
+		}
+	};
+	_extends(Document,Node);
+
+
+	function Element() {
+		this._nsMap = {};
+	};
+	Element.prototype = {
+		nodeType : ELEMENT_NODE,
+		hasAttribute : function(name){
+			return this.getAttributeNode(name)!=null;
+		},
+		getAttribute : function(name){
+			var attr = this.getAttributeNode(name);
+			return attr && attr.value || '';
+		},
+		getAttributeNode : function(name){
+			return this.attributes.getNamedItem(name);
+		},
+		setAttribute : function(name, value){
+			var attr = this.ownerDocument.createAttribute(name);
+			attr.value = attr.nodeValue = "" + value;
+			this.setAttributeNode(attr)
+		},
+		removeAttribute : function(name){
+			var attr = this.getAttributeNode(name)
+			attr && this.removeAttributeNode(attr);
+		},
+		
+		//four real opeartion method
+		appendChild:function(newChild){
+			if(newChild.nodeType === DOCUMENT_FRAGMENT_NODE){
+				return this.insertBefore(newChild,null);
+			}else{
+				return _appendSingleChild(this,newChild);
+			}
+		},
+		setAttributeNode : function(newAttr){
+			return this.attributes.setNamedItem(newAttr);
+		},
+		setAttributeNodeNS : function(newAttr){
+			return this.attributes.setNamedItemNS(newAttr);
+		},
+		removeAttributeNode : function(oldAttr){
+			return this.attributes.removeNamedItem(oldAttr.nodeName);
+		},
+		//get real attribute name,and remove it by removeAttributeNode
+		removeAttributeNS : function(namespaceURI, localName){
+			var old = this.getAttributeNodeNS(namespaceURI, localName);
+			old && this.removeAttributeNode(old);
+		},
+		
+		hasAttributeNS : function(namespaceURI, localName){
+			return this.getAttributeNodeNS(namespaceURI, localName)!=null;
+		},
+		getAttributeNS : function(namespaceURI, localName){
+			var attr = this.getAttributeNodeNS(namespaceURI, localName);
+			return attr && attr.value || '';
+		},
+		setAttributeNS : function(namespaceURI, qualifiedName, value){
+			var attr = this.ownerDocument.createAttributeNS(namespaceURI, qualifiedName);
+			attr.value = attr.nodeValue = "" + value;
+			this.setAttributeNode(attr)
+		},
+		getAttributeNodeNS : function(namespaceURI, localName){
+			return this.attributes.getNamedItemNS(namespaceURI, localName);
+		},
+		
+		getElementsByTagName : function(tagName){
+			return new LiveNodeList(this,function(base){
+				var ls = [];
+				_visitNode(base,function(node){
+					if(node !== base && node.nodeType == ELEMENT_NODE && (tagName === '*' || node.tagName == tagName)){
+						ls.push(node);
+					}
+				});
+				return ls;
+			});
+		},
+		getElementsByTagNameNS : function(namespaceURI, localName){
+			return new LiveNodeList(this,function(base){
+				var ls = [];
+				_visitNode(base,function(node){
+					if(node !== base && node.nodeType === ELEMENT_NODE && (namespaceURI === '*' || node.namespaceURI === namespaceURI) && (localName === '*' || node.localName == localName)){
+						ls.push(node);
+					}
+				});
+				return ls;
+			});
+		}
+	};
+	Document.prototype.getElementsByTagName = Element.prototype.getElementsByTagName;
+	Document.prototype.getElementsByTagNameNS = Element.prototype.getElementsByTagNameNS;
+
+
+	_extends(Element,Node);
+	function Attr() {
+	};
+	Attr.prototype.nodeType = ATTRIBUTE_NODE;
+	_extends(Attr,Node);
+
+
+	function CharacterData() {
+	};
+	CharacterData.prototype = {
+		data : '',
+		substringData : function(offset, count) {
+			return this.data.substring(offset, offset+count);
+		},
+		appendData: function(text) {
+			text = this.data+text;
+			this.nodeValue = this.data = text;
+			this.length = text.length;
+		},
+		insertData: function(offset,text) {
+			this.replaceData(offset,0,text);
+		
+		},
+		appendChild:function(newChild){
+			//if(!(newChild instanceof CharacterData)){
+				throw new Error(ExceptionMessage[3])
+			//}
+			return Node.prototype.appendChild.apply(this,arguments)
+		},
+		deleteData: function(offset, count) {
+			this.replaceData(offset,count,"");
+		},
+		replaceData: function(offset, count, text) {
+			var start = this.data.substring(0,offset);
+			var end = this.data.substring(offset+count);
+			text = start + text + end;
+			this.nodeValue = this.data = text;
+			this.length = text.length;
+		}
+	}
+	_extends(CharacterData,Node);
+	function Text() {
+	};
+	Text.prototype = {
+		nodeName : "#text",
+		nodeType : TEXT_NODE,
+		splitText : function(offset) {
+			var text = this.data;
+			var newText = text.substring(offset);
+			text = text.substring(0, offset);
+			this.data = this.nodeValue = text;
+			this.length = text.length;
+			var newNode = this.ownerDocument.createTextNode(newText);
+			if(this.parentNode){
+				this.parentNode.insertBefore(newNode, this.nextSibling);
+			}
+			return newNode;
+		}
+	}
+	_extends(Text,CharacterData);
+	function Comment() {
+	};
+	Comment.prototype = {
+		nodeName : "#comment",
+		nodeType : COMMENT_NODE
+	}
+	_extends(Comment,CharacterData);
+
+	function CDATASection() {
+	};
+	CDATASection.prototype = {
+		nodeName : "#cdata-section",
+		nodeType : CDATA_SECTION_NODE
+	}
+	_extends(CDATASection,CharacterData);
+
+
+	function DocumentType() {
+	};
+	DocumentType.prototype.nodeType = DOCUMENT_TYPE_NODE;
+	_extends(DocumentType,Node);
+
+	function Notation() {
+	};
+	Notation.prototype.nodeType = NOTATION_NODE;
+	_extends(Notation,Node);
+
+	function Entity() {
+	};
+	Entity.prototype.nodeType = ENTITY_NODE;
+	_extends(Entity,Node);
+
+	function EntityReference() {
+	};
+	EntityReference.prototype.nodeType = ENTITY_REFERENCE_NODE;
+	_extends(EntityReference,Node);
+
+	function DocumentFragment() {
+	};
+	DocumentFragment.prototype.nodeName =	"#document-fragment";
+	DocumentFragment.prototype.nodeType =	DOCUMENT_FRAGMENT_NODE;
+	_extends(DocumentFragment,Node);
+
+
+	function ProcessingInstruction() {
+	}
+	ProcessingInstruction.prototype.nodeType = PROCESSING_INSTRUCTION_NODE;
+	_extends(ProcessingInstruction,Node);
+	function XMLSerializer(){}
+	XMLSerializer.prototype.serializeToString = function(node,attributeSorter){
+		return node.toString(attributeSorter);
+	}
+	Node.prototype.toString =function(attributeSorter){
+		var buf = [];
+		serializeToString(this,buf,attributeSorter);
+		return buf.join('');
+	}
+	function serializeToString(node,buf,attributeSorter,isHTML){
+		switch(node.nodeType){
+		case ELEMENT_NODE:
+			var attrs = node.attributes;
+			var len = attrs.length;
+			var child = node.firstChild;
+			var nodeName = node.tagName;
+			isHTML =  (htmlns === node.namespaceURI) ||isHTML 
+			buf.push('<',nodeName);
+			if(attributeSorter){
+				buf.sort.apply(attrs, attributeSorter);
+			}
+			for(var i=0;i<len;i++){
+				serializeToString(attrs.item(i),buf,attributeSorter,isHTML);
+			}
+			if(child || isHTML && !/^(?:meta|link|img|br|hr|input|button)$/i.test(nodeName)){
+				buf.push('>');
+				//if is cdata child node
+				if(isHTML && /^script$/i.test(nodeName)){
+					if(child){
+						buf.push(child.data);
+					}
+				}else{
+					while(child){
+						serializeToString(child,buf,attributeSorter,isHTML);
+						child = child.nextSibling;
+					}
+				}
+				buf.push('</',nodeName,'>');
+			}else{
+				buf.push('/>');
+			}
+			return;
+		case DOCUMENT_NODE:
+		case DOCUMENT_FRAGMENT_NODE:
+			var child = node.firstChild;
+			while(child){
+				serializeToString(child,buf,attributeSorter,isHTML);
+				child = child.nextSibling;
+			}
+			return;
+		case ATTRIBUTE_NODE:
+			return buf.push(' ',node.name,'="',node.value.replace(/[<&"]/g,_xmlEncoder),'"');
+		case TEXT_NODE:
+			return buf.push(node.data.replace(/[<&]/g,_xmlEncoder));
+		case CDATA_SECTION_NODE:
+			return buf.push( '<![CDATA[',node.data,']]>');
+		case COMMENT_NODE:
+			return buf.push( "<!--",node.data,"-->");
+		case DOCUMENT_TYPE_NODE:
+			var pubid = node.publicId;
+			var sysid = node.systemId;
+			buf.push('<!DOCTYPE ',node.name);
+			if(pubid){
+				buf.push(' PUBLIC "',pubid);
+				if (sysid && sysid!='.') {
+					buf.push( '" "',sysid);
+				}
+				buf.push('">');
+			}else if(sysid && sysid!='.'){
+				buf.push(' SYSTEM "',sysid,'">');
+			}else{
+				var sub = node.internalSubset;
+				if(sub){
+					buf.push(" [",sub,"]");
+				}
+				buf.push(">");
+			}
+			return;
+		case PROCESSING_INSTRUCTION_NODE:
+			return buf.push( "<?",node.target," ",node.data,"?>");
+		case ENTITY_REFERENCE_NODE:
+			return buf.push( '&',node.nodeName,';');
+		//case ENTITY_NODE:
+		//case NOTATION_NODE:
+		default:
+			buf.push('??',node.nodeName);
+		}
+	}
+	function importNode(doc,node,deep){
+		var node2;
+		switch (node.nodeType) {
+		case ELEMENT_NODE:
+			node2 = node.cloneNode(false);
+			node2.ownerDocument = doc;
+			//var attrs = node2.attributes;
+			//var len = attrs.length;
+			//for(var i=0;i<len;i++){
+				//node2.setAttributeNodeNS(importNode(doc,attrs.item(i),deep));
+			//}
+		case DOCUMENT_FRAGMENT_NODE:
+			break;
+		case ATTRIBUTE_NODE:
+			deep = true;
+			break;
+		//case ENTITY_REFERENCE_NODE:
+		//case PROCESSING_INSTRUCTION_NODE:
+		////case TEXT_NODE:
+		//case CDATA_SECTION_NODE:
+		//case COMMENT_NODE:
+		//	deep = false;
+		//	break;
+		//case DOCUMENT_NODE:
+		//case DOCUMENT_TYPE_NODE:
+		//cannot be imported.
+		//case ENTITY_NODE:
+		//case NOTATION_NODE：
+		//can not hit in level3
+		//default:throw e;
+		}
+		if(!node2){
+			node2 = node.cloneNode(false);//false
+		}
+		node2.ownerDocument = doc;
+		node2.parentNode = null;
+		if(deep){
+			var child = node.firstChild;
+			while(child){
+				node2.appendChild(importNode(doc,child,deep));
+				child = child.nextSibling;
+			}
+		}
+		return node2;
+	}
+	//
+	//var _relationMap = {firstChild:1,lastChild:1,previousSibling:1,nextSibling:1,
+	//					attributes:1,childNodes:1,parentNode:1,documentElement:1,doctype,};
+	function cloneNode(doc,node,deep){
+		var node2 = new node.constructor();
+		for(var n in node){
+			var v = node[n];
+			if(typeof v != 'object' ){
+				if(v != node2[n]){
+					node2[n] = v;
+				}
+			}
+		}
+		if(node.childNodes){
+			node2.childNodes = new NodeList();
+		}
+		node2.ownerDocument = doc;
+		switch (node2.nodeType) {
+		case ELEMENT_NODE:
+			var attrs	= node.attributes;
+			var attrs2	= node2.attributes = new NamedNodeMap();
+			var len = attrs.length
+			attrs2._ownerElement = node2;
+			for(var i=0;i<len;i++){
+				node2.setAttributeNode(cloneNode(doc,attrs.item(i),true));
+			}
+			break;;
+		case ATTRIBUTE_NODE:
+			deep = true;
+		}
+		if(deep){
+			var child = node.firstChild;
+			while(child){
+				node2.appendChild(cloneNode(doc,child,deep));
+				child = child.nextSibling;
+			}
+		}
+		return node2;
+	}
+
+	function __set__(object,key,value){
+		object[key] = value
+	}
+	//do dynamic
+	try{
+		if(Object.defineProperty){
+			Object.defineProperty(LiveNodeList.prototype,'length',{
+				get:function(){
+					_updateLiveList(this);
+					return this.$$length;
+				}
+			});
+			Object.defineProperty(Node.prototype,'textContent',{
+				get:function(){
+					return getTextContent(this);
+				},
+				set:function(data){
+					switch(this.nodeType){
+					case 1:
+					case 11:
+						while(this.firstChild){
+							this.removeChild(this.firstChild);
+						}
+						if(data || String(data)){
+							this.appendChild(this.ownerDocument.createTextNode(data));
+						}
+						break;
+					default:
+						//TODO:
+						this.data = data;
+						this.value = value;
+						this.nodeValue = data;
+					}
+				}
+			})
+			
+			function getTextContent(node){
+				switch(node.nodeType){
+				case 1:
+				case 11:
+					var buf = [];
+					node = node.firstChild;
+					while(node){
+						if(node.nodeType!==7 && node.nodeType !==8){
+							buf.push(getTextContent(node));
+						}
+						node = node.nextSibling;
+					}
+					return buf.join('');
+				default:
+					return node.nodeValue;
+				}
+			}
+			__set__ = function(object,key,value){
+				//console.log(value)
+				object['$$'+key] = value
+			}
+		}
+	}catch(e){//ie8
+	}
+
+	if(true){
+		exports.DOMImplementation = DOMImplementation;
+		exports.XMLSerializer = XMLSerializer;
+	}
+
+
+/***/ },
+/* 170 */
+/***/ function(module, exports, __webpack_require__) {
+
+	
+	/*!
+	 * EJS
+	 * Copyright(c) 2012 TJ Holowaychuk <tj@vision-media.ca>
+	 * MIT Licensed
+	 */
+
+	/**
+	 * Module dependencies.
+	 */
+
+	var utils = __webpack_require__(171)
+	  , path = __webpack_require__(172)
+	  , dirname = path.dirname
+	  , extname = path.extname
+	  , join = path.join
+	  , fs = __webpack_require__(173)
+	  , read = fs.readFileSync;
+
+	/**
+	 * Filters.
+	 *
+	 * @type Object
+	 */
+
+	var filters = exports.filters = __webpack_require__(174);
+
+	/**
+	 * Intermediate js cache.
+	 *
+	 * @type Object
+	 */
+
+	var cache = {};
+
+	/**
+	 * Clear intermediate js cache.
+	 *
+	 * @api public
+	 */
+
+	exports.clearCache = function(){
+	  cache = {};
+	};
+
+	/**
+	 * Translate filtered code into function calls.
+	 *
+	 * @param {String} js
+	 * @return {String}
+	 * @api private
+	 */
+
+	function filtered(js) {
+	  return js.substr(1).split('|').reduce(function(js, filter){
+	    var parts = filter.split(':')
+	      , name = parts.shift()
+	      , args = parts.join(':') || '';
+	    if (args) args = ', ' + args;
+	    return 'filters.' + name + '(' + js + args + ')';
+	  });
+	};
+
+	/**
+	 * Re-throw the given `err` in context to the
+	 * `str` of ejs, `filename`, and `lineno`.
+	 *
+	 * @param {Error} err
+	 * @param {String} str
+	 * @param {String} filename
+	 * @param {String} lineno
+	 * @api private
+	 */
+
+	function rethrow(err, str, filename, lineno){
+	  var lines = str.split('\n')
+	    , start = Math.max(lineno - 3, 0)
+	    , end = Math.min(lines.length, lineno + 3);
+
+	  // Error context
+	  var context = lines.slice(start, end).map(function(line, i){
+	    var curr = i + start + 1;
+	    return (curr == lineno ? ' >> ' : '    ')
+	      + curr
+	      + '| '
+	      + line;
+	  }).join('\n');
+
+	  // Alter exception message
+	  err.path = filename;
+	  err.message = (filename || 'ejs') + ':'
+	    + lineno + '\n'
+	    + context + '\n\n'
+	    + err.message;
+
+	  throw err;
+	}
+
+	/**
+	 * Parse the given `str` of ejs, returning the function body.
+	 *
+	 * @param {String} str
+	 * @return {String}
+	 * @api public
+	 */
+
+	var parse = exports.parse = function(str, options){
+	  var options = options || {}
+	    , open = options.open || exports.open || '<%'
+	    , close = options.close || exports.close || '%>'
+	    , filename = options.filename
+	    , compileDebug = options.compileDebug !== false
+	    , buf = "";
+
+	  buf += 'var buf = [];';
+	  if (false !== options._with) buf += '\nwith (locals || {}) { (function(){ ';
+	  buf += '\n buf.push(\'';
+
+	  var lineno = 1;
+
+	  var consumeEOL = false;
+	  for (var i = 0, len = str.length; i < len; ++i) {
+	    var stri = str[i];
+	    if (str.slice(i, open.length + i) == open) {
+	      i += open.length
+
+	      var prefix, postfix, line = (compileDebug ? '__stack.lineno=' : '') + lineno;
+	      switch (str[i]) {
+	        case '=':
+	          prefix = "', escape((" + line + ', ';
+	          postfix = ")), '";
+	          ++i;
+	          break;
+	        case '-':
+	          prefix = "', (" + line + ', ';
+	          postfix = "), '";
+	          ++i;
+	          break;
+	        default:
+	          prefix = "');" + line + ';';
+	          postfix = "; buf.push('";
+	      }
+
+	      var end = str.indexOf(close, i);
+
+	      if (end < 0){
+	        throw new Error('Could not find matching close tag "' + close + '".');
+	      }
+
+	      var js = str.substring(i, end)
+	        , start = i
+	        , include = null
+	        , n = 0;
+
+	      if ('-' == js[js.length-1]){
+	        js = js.substring(0, js.length - 2);
+	        consumeEOL = true;
+	      }
+
+	      if (0 == js.trim().indexOf('include')) {
+	        var name = js.trim().slice(7).trim();
+	        if (!filename) throw new Error('filename option is required for includes');
+	        var path = resolveInclude(name, filename);
+	        include = read(path, 'utf8');
+	        include = exports.parse(include, { filename: path, _with: false, open: open, close: close, compileDebug: compileDebug });
+	        buf += "' + (function(){" + include + "})() + '";
+	        js = '';
+	      }
+
+	      while (~(n = js.indexOf("\n", n))) n++, lineno++;
+	      if (js.substr(0, 1) == ':') js = filtered(js);
+	      if (js) {
+	        if (js.lastIndexOf('//') > js.lastIndexOf('\n')) js += '\n';
+	        buf += prefix;
+	        buf += js;
+	        buf += postfix;
+	      }
+	      i += end - start + close.length - 1;
+
+	    } else if (stri == "\\") {
+	      buf += "\\\\";
+	    } else if (stri == "'") {
+	      buf += "\\'";
+	    } else if (stri == "\r") {
+	      // ignore
+	    } else if (stri == "\n") {
+	      if (consumeEOL) {
+	        consumeEOL = false;
+	      } else {
+	        buf += "\\n";
+	        lineno++;
+	      }
+	    } else {
+	      buf += stri;
+	    }
+	  }
+
+	  if (false !== options._with) buf += "'); })();\n} \nreturn buf.join('');";
+	  else buf += "');\nreturn buf.join('');";
+	  return buf;
+	};
+
+	/**
+	 * Compile the given `str` of ejs into a `Function`.
+	 *
+	 * @param {String} str
+	 * @param {Object} options
+	 * @return {Function}
+	 * @api public
+	 */
+
+	var compile = exports.compile = function(str, options){
+	  options = options || {};
+	  var escape = options.escape || utils.escape;
+
+	  var input = JSON.stringify(str)
+	    , compileDebug = options.compileDebug !== false
+	    , client = options.client
+	    , filename = options.filename
+	        ? JSON.stringify(options.filename)
+	        : 'undefined';
+
+	  if (compileDebug) {
+	    // Adds the fancy stack trace meta info
+	    str = [
+	      'var __stack = { lineno: 1, input: ' + input + ', filename: ' + filename + ' };',
+	      rethrow.toString(),
+	      'try {',
+	      exports.parse(str, options),
+	      '} catch (err) {',
+	      '  rethrow(err, __stack.input, __stack.filename, __stack.lineno);',
+	      '}'
+	    ].join("\n");
+	  } else {
+	    str = exports.parse(str, options);
+	  }
+
+	  if (options.debug) console.log(str);
+	  if (client) str = 'escape = escape || ' + escape.toString() + ';\n' + str;
+
+	  try {
+	    var fn = new Function('locals, filters, escape, rethrow', str);
+	  } catch (err) {
+	    if ('SyntaxError' == err.name) {
+	      err.message += options.filename
+	        ? ' in ' + filename
+	        : ' while compiling ejs';
+	    }
+	    throw err;
+	  }
+
+	  if (client) return fn;
+
+	  return function(locals){
+	    return fn.call(this, locals, filters, escape, rethrow);
+	  }
+	};
+
+	/**
+	 * Render the given `str` of ejs.
+	 *
+	 * Options:
+	 *
+	 *   - `locals`          Local variables object
+	 *   - `cache`           Compiled functions are cached, requires `filename`
+	 *   - `filename`        Used by `cache` to key caches
+	 *   - `scope`           Function execution context
+	 *   - `debug`           Output generated function body
+	 *   - `open`            Open tag, defaulting to "<%"
+	 *   - `close`           Closing tag, defaulting to "%>"
+	 *
+	 * @param {String} str
+	 * @param {Object} options
+	 * @return {String}
+	 * @api public
+	 */
+
+	exports.render = function(str, options){
+	  var fn
+	    , options = options || {};
+
+	  if (options.cache) {
+	    if (options.filename) {
+	      fn = cache[options.filename] || (cache[options.filename] = compile(str, options));
+	    } else {
+	      throw new Error('"cache" option requires "filename".');
+	    }
+	  } else {
+	    fn = compile(str, options);
+	  }
+
+	  options.__proto__ = options.locals;
+	  return fn.call(options.scope, options);
+	};
+
+	/**
+	 * Render an EJS file at the given `path` and callback `fn(err, str)`.
+	 *
+	 * @param {String} path
+	 * @param {Object|Function} options or callback
+	 * @param {Function} fn
+	 * @api public
+	 */
+
+	exports.renderFile = function(path, options, fn){
+	  var key = path + ':string';
+
+	  if ('function' == typeof options) {
+	    fn = options, options = {};
+	  }
+
+	  options.filename = path;
+
+	  var str;
+	  try {
+	    str = options.cache
+	      ? cache[key] || (cache[key] = read(path, 'utf8'))
+	      : read(path, 'utf8');
+	  } catch (err) {
+	    fn(err);
+	    return;
+	  }
+	  fn(null, exports.render(str, options));
+	};
+
+	/**
+	 * Resolve include `name` relative to `filename`.
+	 *
+	 * @param {String} name
+	 * @param {String} filename
+	 * @return {String}
+	 * @api private
+	 */
+
+	function resolveInclude(name, filename) {
+	  var path = join(dirname(filename), name);
+	  var ext = extname(name);
+	  if (!ext) path += '.ejs';
+	  return path;
+	}
+
+	// express support
+
+	exports.__express = exports.renderFile;
+
+	/**
+	 * Expose to require().
+	 */
+
+	if ((void 0)) {
+	  (void 0)['.ejs'] = function (module, filename) {
+	    filename = filename || module.filename;
+	    var options = { filename: filename, client: true }
+	      , template = fs.readFileSync(filename).toString()
+	      , fn = compile(template, options);
+	    module._compile('module.exports = ' + fn.toString() + ';', filename);
+	  };
+	} else if (__webpack_require__(175).registerExtension) {
+	  __webpack_require__(175).registerExtension('.ejs', function(src) {
+	    return compile(src, {});
+	  });
+	}
+
+
+/***/ },
+/* 171 */
+/***/ function(module, exports) {
+
+	
+	/*!
+	 * EJS
+	 * Copyright(c) 2010 TJ Holowaychuk <tj@vision-media.ca>
+	 * MIT Licensed
+	 */
+
+	/**
+	 * Escape the given string of `html`.
+	 *
+	 * @param {String} html
+	 * @return {String}
+	 * @api private
+	 */
+
+	exports.escape = function(html){
+	  return String(html)
+	    .replace(/&/g, '&amp;')
+	    .replace(/</g, '&lt;')
+	    .replace(/>/g, '&gt;')
+	    .replace(/'/g, '&#39;')
+	    .replace(/"/g, '&quot;');
+	};
+	 
+
+
+/***/ },
+/* 172 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
+	//
+	// Permission is hereby granted, free of charge, to any person obtaining a
+	// copy of this software and associated documentation files (the
+	// "Software"), to deal in the Software without restriction, including
+	// without limitation the rights to use, copy, modify, merge, publish,
+	// distribute, sublicense, and/or sell copies of the Software, and to permit
+	// persons to whom the Software is furnished to do so, subject to the
+	// following conditions:
+	//
+	// The above copyright notice and this permission notice shall be included
+	// in all copies or substantial portions of the Software.
+	//
+	// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+	// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+	// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+	// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+	// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+	// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+	// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+	// resolves . and .. elements in a path array with directory names there
+	// must be no slashes, empty elements, or device names (c:\) in the array
+	// (so also no leading and trailing slashes - it does not distinguish
+	// relative and absolute paths)
+	function normalizeArray(parts, allowAboveRoot) {
+	  // if the path tries to go above the root, `up` ends up > 0
+	  var up = 0;
+	  for (var i = parts.length - 1; i >= 0; i--) {
+	    var last = parts[i];
+	    if (last === '.') {
+	      parts.splice(i, 1);
+	    } else if (last === '..') {
+	      parts.splice(i, 1);
+	      up++;
+	    } else if (up) {
+	      parts.splice(i, 1);
+	      up--;
+	    }
+	  }
+
+	  // if the path is allowed to go above the root, restore leading ..s
+	  if (allowAboveRoot) {
+	    for (; up--; up) {
+	      parts.unshift('..');
+	    }
+	  }
+
+	  return parts;
+	}
+
+	// Split a filename into [root, dir, basename, ext], unix version
+	// 'root' is just a slash, or nothing.
+	var splitPathRe =
+	    /^(\/?|)([\s\S]*?)((?:\.{1,2}|[^\/]+?|)(\.[^.\/]*|))(?:[\/]*)$/;
+	var splitPath = function(filename) {
+	  return splitPathRe.exec(filename).slice(1);
+	};
+
+	// path.resolve([from ...], to)
+	// posix version
+	exports.resolve = function() {
+	  var resolvedPath = '',
+	      resolvedAbsolute = false;
+
+	  for (var i = arguments.length - 1; i >= -1 && !resolvedAbsolute; i--) {
+	    var path = (i >= 0) ? arguments[i] : process.cwd();
+
+	    // Skip empty and invalid entries
+	    if (typeof path !== 'string') {
+	      throw new TypeError('Arguments to path.resolve must be strings');
+	    } else if (!path) {
+	      continue;
+	    }
+
+	    resolvedPath = path + '/' + resolvedPath;
+	    resolvedAbsolute = path.charAt(0) === '/';
+	  }
+
+	  // At this point the path should be resolved to a full absolute path, but
+	  // handle relative paths to be safe (might happen when process.cwd() fails)
+
+	  // Normalize the path
+	  resolvedPath = normalizeArray(filter(resolvedPath.split('/'), function(p) {
+	    return !!p;
+	  }), !resolvedAbsolute).join('/');
+
+	  return ((resolvedAbsolute ? '/' : '') + resolvedPath) || '.';
+	};
+
+	// path.normalize(path)
+	// posix version
+	exports.normalize = function(path) {
+	  var isAbsolute = exports.isAbsolute(path),
+	      trailingSlash = substr(path, -1) === '/';
+
+	  // Normalize the path
+	  path = normalizeArray(filter(path.split('/'), function(p) {
+	    return !!p;
+	  }), !isAbsolute).join('/');
+
+	  if (!path && !isAbsolute) {
+	    path = '.';
+	  }
+	  if (path && trailingSlash) {
+	    path += '/';
+	  }
+
+	  return (isAbsolute ? '/' : '') + path;
+	};
+
+	// posix version
+	exports.isAbsolute = function(path) {
+	  return path.charAt(0) === '/';
+	};
+
+	// posix version
+	exports.join = function() {
+	  var paths = Array.prototype.slice.call(arguments, 0);
+	  return exports.normalize(filter(paths, function(p, index) {
+	    if (typeof p !== 'string') {
+	      throw new TypeError('Arguments to path.join must be strings');
+	    }
+	    return p;
+	  }).join('/'));
+	};
+
+
+	// path.relative(from, to)
+	// posix version
+	exports.relative = function(from, to) {
+	  from = exports.resolve(from).substr(1);
+	  to = exports.resolve(to).substr(1);
+
+	  function trim(arr) {
+	    var start = 0;
+	    for (; start < arr.length; start++) {
+	      if (arr[start] !== '') break;
+	    }
+
+	    var end = arr.length - 1;
+	    for (; end >= 0; end--) {
+	      if (arr[end] !== '') break;
+	    }
+
+	    if (start > end) return [];
+	    return arr.slice(start, end - start + 1);
+	  }
+
+	  var fromParts = trim(from.split('/'));
+	  var toParts = trim(to.split('/'));
+
+	  var length = Math.min(fromParts.length, toParts.length);
+	  var samePartsLength = length;
+	  for (var i = 0; i < length; i++) {
+	    if (fromParts[i] !== toParts[i]) {
+	      samePartsLength = i;
+	      break;
+	    }
+	  }
+
+	  var outputParts = [];
+	  for (var i = samePartsLength; i < fromParts.length; i++) {
+	    outputParts.push('..');
+	  }
+
+	  outputParts = outputParts.concat(toParts.slice(samePartsLength));
+
+	  return outputParts.join('/');
+	};
+
+	exports.sep = '/';
+	exports.delimiter = ':';
+
+	exports.dirname = function(path) {
+	  var result = splitPath(path),
+	      root = result[0],
+	      dir = result[1];
+
+	  if (!root && !dir) {
+	    // No dirname whatsoever
+	    return '.';
+	  }
+
+	  if (dir) {
+	    // It has a dirname, strip trailing slash
+	    dir = dir.substr(0, dir.length - 1);
+	  }
+
+	  return root + dir;
+	};
+
+
+	exports.basename = function(path, ext) {
+	  var f = splitPath(path)[2];
+	  // TODO: make this comparison case-insensitive on windows?
+	  if (ext && f.substr(-1 * ext.length) === ext) {
+	    f = f.substr(0, f.length - ext.length);
+	  }
+	  return f;
+	};
+
+
+	exports.extname = function(path) {
+	  return splitPath(path)[3];
+	};
+
+	function filter (xs, f) {
+	    if (xs.filter) return xs.filter(f);
+	    var res = [];
+	    for (var i = 0; i < xs.length; i++) {
+	        if (f(xs[i], i, xs)) res.push(xs[i]);
+	    }
+	    return res;
+	}
+
+	// String.prototype.substr - negative index don't work in IE8
+	var substr = 'ab'.substr(-1) === 'b'
+	    ? function (str, start, len) { return str.substr(start, len) }
+	    : function (str, start, len) {
+	        if (start < 0) start = str.length + start;
+	        return str.substr(start, len);
+	    }
+	;
+
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
+
+/***/ },
+/* 173 */
+/***/ function(module, exports) {
+
+	
+
+/***/ },
+/* 174 */
+/***/ function(module, exports) {
+
+	/*!
+	 * EJS - Filters
+	 * Copyright(c) 2010 TJ Holowaychuk <tj@vision-media.ca>
+	 * MIT Licensed
+	 */
+
+	/**
+	 * First element of the target `obj`.
+	 */
+
+	exports.first = function(obj) {
+	  return obj[0];
+	};
+
+	/**
+	 * Last element of the target `obj`.
+	 */
+
+	exports.last = function(obj) {
+	  return obj[obj.length - 1];
+	};
+
+	/**
+	 * Capitalize the first letter of the target `str`.
+	 */
+
+	exports.capitalize = function(str){
+	  str = String(str);
+	  return str[0].toUpperCase() + str.substr(1, str.length);
+	};
+
+	/**
+	 * Downcase the target `str`.
+	 */
+
+	exports.downcase = function(str){
+	  return String(str).toLowerCase();
+	};
+
+	/**
+	 * Uppercase the target `str`.
+	 */
+
+	exports.upcase = function(str){
+	  return String(str).toUpperCase();
+	};
+
+	/**
+	 * Sort the target `obj`.
+	 */
+
+	exports.sort = function(obj){
+	  return Object.create(obj).sort();
+	};
+
+	/**
+	 * Sort the target `obj` by the given `prop` ascending.
+	 */
+
+	exports.sort_by = function(obj, prop){
+	  return Object.create(obj).sort(function(a, b){
+	    a = a[prop], b = b[prop];
+	    if (a > b) return 1;
+	    if (a < b) return -1;
+	    return 0;
+	  });
+	};
+
+	/**
+	 * Size or length of the target `obj`.
+	 */
+
+	exports.size = exports.length = function(obj) {
+	  return obj.length;
+	};
+
+	/**
+	 * Add `a` and `b`.
+	 */
+
+	exports.plus = function(a, b){
+	  return Number(a) + Number(b);
+	};
+
+	/**
+	 * Subtract `b` from `a`.
+	 */
+
+	exports.minus = function(a, b){
+	  return Number(a) - Number(b);
+	};
+
+	/**
+	 * Multiply `a` by `b`.
+	 */
+
+	exports.times = function(a, b){
+	  return Number(a) * Number(b);
+	};
+
+	/**
+	 * Divide `a` by `b`.
+	 */
+
+	exports.divided_by = function(a, b){
+	  return Number(a) / Number(b);
+	};
+
+	/**
+	 * Join `obj` with the given `str`.
+	 */
+
+	exports.join = function(obj, str){
+	  return obj.join(str || ', ');
+	};
+
+	/**
+	 * Truncate `str` to `len`.
+	 */
+
+	exports.truncate = function(str, len, append){
+	  str = String(str);
+	  if (str.length > len) {
+	    str = str.slice(0, len);
+	    if (append) str += append;
+	  }
+	  return str;
+	};
+
+	/**
+	 * Truncate `str` to `n` words.
+	 */
+
+	exports.truncate_words = function(str, n){
+	  var str = String(str)
+	    , words = str.split(/ +/);
+	  return words.slice(0, n).join(' ');
+	};
+
+	/**
+	 * Replace `pattern` with `substitution` in `str`.
+	 */
+
+	exports.replace = function(str, pattern, substitution){
+	  return String(str).replace(pattern, substitution || '');
+	};
+
+	/**
+	 * Prepend `val` to `obj`.
+	 */
+
+	exports.prepend = function(obj, val){
+	  return Array.isArray(obj)
+	    ? [val].concat(obj)
+	    : val + obj;
+	};
+
+	/**
+	 * Append `val` to `obj`.
+	 */
+
+	exports.append = function(obj, val){
+	  return Array.isArray(obj)
+	    ? obj.concat(val)
+	    : obj + val;
+	};
+
+	/**
+	 * Map the given `prop`.
+	 */
+
+	exports.map = function(arr, prop){
+	  return arr.map(function(obj){
+	    return obj[prop];
+	  });
+	};
+
+	/**
+	 * Reverse the given `obj`.
+	 */
+
+	exports.reverse = function(obj){
+	  return Array.isArray(obj)
+	    ? obj.reverse()
+	    : String(obj).split('').reverse().join('');
+	};
+
+	/**
+	 * Get `prop` of the given `obj`.
+	 */
+
+	exports.get = function(obj, prop){
+	  return obj[prop];
+	};
+
+	/**
+	 * Packs the given `obj` into json string
+	 */
+	exports.json = function(obj){
+	  return JSON.stringify(obj);
+	};
+
+
+/***/ },
+/* 175 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var map = {
+		"./ejs": 170,
+		"./ejs.js": 170,
+		"./filters": 174,
+		"./filters.js": 174,
+		"./utils": 171,
+		"./utils.js": 171
+	};
+	function webpackContext(req) {
+		return __webpack_require__(webpackContextResolve(req));
+	};
+	function webpackContextResolve(req) {
+		return map[req] || (function() { throw new Error("Cannot find module '" + req + "'.") }());
+	};
+	webpackContext.keys = function webpackContextKeys() {
+		return Object.keys(map);
+	};
+	webpackContext.resolve = webpackContextResolve;
+	module.exports = webpackContext;
+	webpackContext.id = 175;
+
+
+/***/ },
+/* 176 */,
+/* 177 */
+/***/ function(module, exports, __webpack_require__) {
+
 	// Generated by CoffeeScript 1.10.0
 	(function() {
 	  "use strict";
@@ -20079,17 +26989,17 @@
 	    hasProp = {}.hasOwnProperty,
 	    bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
-	  sax = __webpack_require__(167);
+	  sax = __webpack_require__(178);
 
-	  events = __webpack_require__(173);
+	  events = __webpack_require__(184);
 
-	  builder = __webpack_require__(189);
+	  builder = __webpack_require__(200);
 
-	  bom = __webpack_require__(322);
+	  bom = __webpack_require__(333);
 
-	  processors = __webpack_require__(323);
+	  processors = __webpack_require__(334);
 
-	  setImmediate = __webpack_require__(324).setImmediate;
+	  setImmediate = __webpack_require__(335).setImmediate;
 
 	  isEmpty = function(thing) {
 	    return typeof thing === "object" && (thing != null) && Object.keys(thing).length === 0;
@@ -20612,7 +27522,7 @@
 
 
 /***/ },
-/* 167 */
+/* 178 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {;(function (sax) { // wrapper for non-node envs
@@ -20777,7 +27687,7 @@
 
 	  var Stream
 	  try {
-	    Stream = __webpack_require__(172).Stream
+	    Stream = __webpack_require__(183).Stream
 	  } catch (ex) {
 	    Stream = function () {}
 	  }
@@ -20847,7 +27757,7 @@
 	      typeof Buffer.isBuffer === 'function' &&
 	      Buffer.isBuffer(data)) {
 	      if (!this._decoder) {
-	        var SD = __webpack_require__(182).StringDecoder
+	        var SD = __webpack_require__(193).StringDecoder
 	        this._decoder = new SD('utf8')
 	      }
 	      data = this._decoder.write(data)
@@ -22192,10 +29102,10 @@
 	  }
 	})( false ? this.sax = {} : exports)
 
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(168).Buffer))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(179).Buffer))
 
 /***/ },
-/* 168 */
+/* 179 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer, global) {/*!
@@ -22208,9 +29118,9 @@
 
 	'use strict'
 
-	var base64 = __webpack_require__(169)
-	var ieee754 = __webpack_require__(170)
-	var isArray = __webpack_require__(171)
+	var base64 = __webpack_require__(180)
+	var ieee754 = __webpack_require__(181)
+	var isArray = __webpack_require__(182)
 
 	exports.Buffer = Buffer
 	exports.SlowBuffer = SlowBuffer
@@ -23747,10 +30657,10 @@
 	  return i
 	}
 
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(168).Buffer, (function() { return this; }())))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(179).Buffer, (function() { return this; }())))
 
 /***/ },
-/* 169 */
+/* 180 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -23880,7 +30790,7 @@
 
 
 /***/ },
-/* 170 */
+/* 181 */
 /***/ function(module, exports) {
 
 	exports.read = function (buffer, offset, isLE, mLen, nBytes) {
@@ -23970,7 +30880,7 @@
 
 
 /***/ },
-/* 171 */
+/* 182 */
 /***/ function(module, exports) {
 
 	var toString = {}.toString;
@@ -23981,7 +30891,7 @@
 
 
 /***/ },
-/* 172 */
+/* 183 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -24007,15 +30917,15 @@
 
 	module.exports = Stream;
 
-	var EE = __webpack_require__(173).EventEmitter;
-	var inherits = __webpack_require__(174);
+	var EE = __webpack_require__(184).EventEmitter;
+	var inherits = __webpack_require__(185);
 
 	inherits(Stream, EE);
-	Stream.Readable = __webpack_require__(175);
-	Stream.Writable = __webpack_require__(185);
-	Stream.Duplex = __webpack_require__(186);
-	Stream.Transform = __webpack_require__(187);
-	Stream.PassThrough = __webpack_require__(188);
+	Stream.Readable = __webpack_require__(186);
+	Stream.Writable = __webpack_require__(196);
+	Stream.Duplex = __webpack_require__(197);
+	Stream.Transform = __webpack_require__(198);
+	Stream.PassThrough = __webpack_require__(199);
 
 	// Backwards-compat with node 0.4.x
 	Stream.Stream = Stream;
@@ -24114,7 +31024,7 @@
 
 
 /***/ },
-/* 173 */
+/* 184 */
 /***/ function(module, exports) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -24418,7 +31328,7 @@
 
 
 /***/ },
-/* 174 */
+/* 185 */
 /***/ function(module, exports) {
 
 	if (typeof Object.create === 'function') {
@@ -24447,20 +31357,20 @@
 
 
 /***/ },
-/* 175 */
+/* 186 */
 /***/ function(module, exports, __webpack_require__) {
 
-	exports = module.exports = __webpack_require__(176);
-	exports.Stream = __webpack_require__(172);
+	exports = module.exports = __webpack_require__(187);
+	exports.Stream = __webpack_require__(183);
 	exports.Readable = exports;
-	exports.Writable = __webpack_require__(181);
-	exports.Duplex = __webpack_require__(180);
-	exports.Transform = __webpack_require__(183);
-	exports.PassThrough = __webpack_require__(184);
+	exports.Writable = __webpack_require__(192);
+	exports.Duplex = __webpack_require__(191);
+	exports.Transform = __webpack_require__(194);
+	exports.PassThrough = __webpack_require__(195);
 
 
 /***/ },
-/* 176 */
+/* 187 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
@@ -24487,17 +31397,17 @@
 	module.exports = Readable;
 
 	/*<replacement>*/
-	var isArray = __webpack_require__(177);
+	var isArray = __webpack_require__(188);
 	/*</replacement>*/
 
 
 	/*<replacement>*/
-	var Buffer = __webpack_require__(168).Buffer;
+	var Buffer = __webpack_require__(179).Buffer;
 	/*</replacement>*/
 
 	Readable.ReadableState = ReadableState;
 
-	var EE = __webpack_require__(173).EventEmitter;
+	var EE = __webpack_require__(184).EventEmitter;
 
 	/*<replacement>*/
 	if (!EE.listenerCount) EE.listenerCount = function(emitter, type) {
@@ -24505,18 +31415,18 @@
 	};
 	/*</replacement>*/
 
-	var Stream = __webpack_require__(172);
+	var Stream = __webpack_require__(183);
 
 	/*<replacement>*/
-	var util = __webpack_require__(178);
-	util.inherits = __webpack_require__(174);
+	var util = __webpack_require__(189);
+	util.inherits = __webpack_require__(185);
 	/*</replacement>*/
 
 	var StringDecoder;
 
 
 	/*<replacement>*/
-	var debug = __webpack_require__(179);
+	var debug = __webpack_require__(190);
 	if (debug && debug.debuglog) {
 	  debug = debug.debuglog('stream');
 	} else {
@@ -24528,7 +31438,7 @@
 	util.inherits(Readable, Stream);
 
 	function ReadableState(options, stream) {
-	  var Duplex = __webpack_require__(180);
+	  var Duplex = __webpack_require__(191);
 
 	  options = options || {};
 
@@ -24589,14 +31499,14 @@
 	  this.encoding = null;
 	  if (options.encoding) {
 	    if (!StringDecoder)
-	      StringDecoder = __webpack_require__(182).StringDecoder;
+	      StringDecoder = __webpack_require__(193).StringDecoder;
 	    this.decoder = new StringDecoder(options.encoding);
 	    this.encoding = options.encoding;
 	  }
 	}
 
 	function Readable(options) {
-	  var Duplex = __webpack_require__(180);
+	  var Duplex = __webpack_require__(191);
 
 	  if (!(this instanceof Readable))
 	    return new Readable(options);
@@ -24699,7 +31609,7 @@
 	// backwards compatibility.
 	Readable.prototype.setEncoding = function(enc) {
 	  if (!StringDecoder)
-	    StringDecoder = __webpack_require__(182).StringDecoder;
+	    StringDecoder = __webpack_require__(193).StringDecoder;
 	  this._readableState.decoder = new StringDecoder(enc);
 	  this._readableState.encoding = enc;
 	  return this;
@@ -25418,7 +32328,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
 
 /***/ },
-/* 177 */
+/* 188 */
 /***/ function(module, exports) {
 
 	module.exports = Array.isArray || function (arr) {
@@ -25427,7 +32337,7 @@
 
 
 /***/ },
-/* 178 */
+/* 189 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(Buffer) {// Copyright Joyent, Inc. and other Node contributors.
@@ -25538,16 +32448,16 @@
 	  return Object.prototype.toString.call(o);
 	}
 
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(168).Buffer))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(179).Buffer))
 
 /***/ },
-/* 179 */
+/* 190 */
 /***/ function(module, exports) {
 
 	/* (ignored) */
 
 /***/ },
-/* 180 */
+/* 191 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
@@ -25588,12 +32498,12 @@
 
 
 	/*<replacement>*/
-	var util = __webpack_require__(178);
-	util.inherits = __webpack_require__(174);
+	var util = __webpack_require__(189);
+	util.inherits = __webpack_require__(185);
 	/*</replacement>*/
 
-	var Readable = __webpack_require__(176);
-	var Writable = __webpack_require__(181);
+	var Readable = __webpack_require__(187);
+	var Writable = __webpack_require__(192);
 
 	util.inherits(Duplex, Readable);
 
@@ -25643,7 +32553,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
 
 /***/ },
-/* 181 */
+/* 192 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
@@ -25674,18 +32584,18 @@
 	module.exports = Writable;
 
 	/*<replacement>*/
-	var Buffer = __webpack_require__(168).Buffer;
+	var Buffer = __webpack_require__(179).Buffer;
 	/*</replacement>*/
 
 	Writable.WritableState = WritableState;
 
 
 	/*<replacement>*/
-	var util = __webpack_require__(178);
-	util.inherits = __webpack_require__(174);
+	var util = __webpack_require__(189);
+	util.inherits = __webpack_require__(185);
 	/*</replacement>*/
 
-	var Stream = __webpack_require__(172);
+	var Stream = __webpack_require__(183);
 
 	util.inherits(Writable, Stream);
 
@@ -25696,7 +32606,7 @@
 	}
 
 	function WritableState(options, stream) {
-	  var Duplex = __webpack_require__(180);
+	  var Duplex = __webpack_require__(191);
 
 	  options = options || {};
 
@@ -25784,7 +32694,7 @@
 	}
 
 	function Writable(options) {
-	  var Duplex = __webpack_require__(180);
+	  var Duplex = __webpack_require__(191);
 
 	  // Writable ctor is applied to Duplexes, though they're not
 	  // instanceof Writable, they're instanceof Readable.
@@ -26127,7 +33037,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
 
 /***/ },
-/* 182 */
+/* 193 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -26151,7 +33061,7 @@
 	// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 	// USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-	var Buffer = __webpack_require__(168).Buffer;
+	var Buffer = __webpack_require__(179).Buffer;
 
 	var isBufferEncoding = Buffer.isEncoding
 	  || function(encoding) {
@@ -26354,7 +33264,7 @@
 
 
 /***/ },
-/* 183 */
+/* 194 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -26423,11 +33333,11 @@
 
 	module.exports = Transform;
 
-	var Duplex = __webpack_require__(180);
+	var Duplex = __webpack_require__(191);
 
 	/*<replacement>*/
-	var util = __webpack_require__(178);
-	util.inherits = __webpack_require__(174);
+	var util = __webpack_require__(189);
+	util.inherits = __webpack_require__(185);
 	/*</replacement>*/
 
 	util.inherits(Transform, Duplex);
@@ -26569,7 +33479,7 @@
 
 
 /***/ },
-/* 184 */
+/* 195 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Copyright Joyent, Inc. and other Node contributors.
@@ -26599,11 +33509,11 @@
 
 	module.exports = PassThrough;
 
-	var Transform = __webpack_require__(183);
+	var Transform = __webpack_require__(194);
 
 	/*<replacement>*/
-	var util = __webpack_require__(178);
-	util.inherits = __webpack_require__(174);
+	var util = __webpack_require__(189);
+	util.inherits = __webpack_require__(185);
 	/*</replacement>*/
 
 	util.inherits(PassThrough, Transform);
@@ -26621,44 +33531,44 @@
 
 
 /***/ },
-/* 185 */
+/* 196 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(181)
+	module.exports = __webpack_require__(192)
 
 
 /***/ },
-/* 186 */
+/* 197 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(180)
+	module.exports = __webpack_require__(191)
 
 
 /***/ },
-/* 187 */
+/* 198 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(183)
+	module.exports = __webpack_require__(194)
 
 
 /***/ },
-/* 188 */
+/* 199 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(184)
+	module.exports = __webpack_require__(195)
 
 
 /***/ },
-/* 189 */
+/* 200 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
 	(function() {
 	  var XMLBuilder, assign;
 
-	  assign = __webpack_require__(190);
+	  assign = __webpack_require__(201);
 
-	  XMLBuilder = __webpack_require__(221);
+	  XMLBuilder = __webpack_require__(232);
 
 	  module.exports.create = function(name, xmldec, doctype, options) {
 	    options = assign({}, xmldec, doctype, options);
@@ -26669,15 +33579,15 @@
 
 
 /***/ },
-/* 190 */
+/* 201 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assignValue = __webpack_require__(191),
-	    copyObject = __webpack_require__(193),
-	    createAssigner = __webpack_require__(195),
-	    isArrayLike = __webpack_require__(197),
-	    isPrototype = __webpack_require__(210),
-	    keys = __webpack_require__(211);
+	var assignValue = __webpack_require__(202),
+	    copyObject = __webpack_require__(204),
+	    createAssigner = __webpack_require__(206),
+	    isArrayLike = __webpack_require__(208),
+	    isPrototype = __webpack_require__(221),
+	    keys = __webpack_require__(222);
 
 	/** Used for built-in method references. */
 	var objectProto = Object.prototype;
@@ -26738,10 +33648,10 @@
 
 
 /***/ },
-/* 191 */
+/* 202 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var eq = __webpack_require__(192);
+	var eq = __webpack_require__(203);
 
 	/** Used for built-in method references. */
 	var objectProto = Object.prototype;
@@ -26771,7 +33681,7 @@
 
 
 /***/ },
-/* 192 */
+/* 203 */
 /***/ function(module, exports) {
 
 	/**
@@ -26814,10 +33724,10 @@
 
 
 /***/ },
-/* 193 */
+/* 204 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var copyObjectWith = __webpack_require__(194);
+	var copyObjectWith = __webpack_require__(205);
 
 	/**
 	 * Copies properties of `source` to `object`.
@@ -26836,10 +33746,10 @@
 
 
 /***/ },
-/* 194 */
+/* 205 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assignValue = __webpack_require__(191);
+	var assignValue = __webpack_require__(202);
 
 	/**
 	 * This function is like `copyObject` except that it accepts a function to
@@ -26874,11 +33784,11 @@
 
 
 /***/ },
-/* 195 */
+/* 206 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isIterateeCall = __webpack_require__(196),
-	    rest = __webpack_require__(204);
+	var isIterateeCall = __webpack_require__(207),
+	    rest = __webpack_require__(215);
 
 	/**
 	 * Creates a function like `_.assign`.
@@ -26917,13 +33827,13 @@
 
 
 /***/ },
-/* 196 */
+/* 207 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var eq = __webpack_require__(192),
-	    isArrayLike = __webpack_require__(197),
-	    isIndex = __webpack_require__(203),
-	    isObject = __webpack_require__(201);
+	var eq = __webpack_require__(203),
+	    isArrayLike = __webpack_require__(208),
+	    isIndex = __webpack_require__(214),
+	    isObject = __webpack_require__(212);
 
 	/**
 	 * Checks if the given arguments are from an iteratee call.
@@ -26953,12 +33863,12 @@
 
 
 /***/ },
-/* 197 */
+/* 208 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var getLength = __webpack_require__(198),
-	    isFunction = __webpack_require__(200),
-	    isLength = __webpack_require__(202);
+	var getLength = __webpack_require__(209),
+	    isFunction = __webpack_require__(211),
+	    isLength = __webpack_require__(213);
 
 	/**
 	 * Checks if `value` is array-like. A value is considered array-like if it's
@@ -26993,10 +33903,10 @@
 
 
 /***/ },
-/* 198 */
+/* 209 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseProperty = __webpack_require__(199);
+	var baseProperty = __webpack_require__(210);
 
 	/**
 	 * Gets the "length" property value of `object`.
@@ -27015,7 +33925,7 @@
 
 
 /***/ },
-/* 199 */
+/* 210 */
 /***/ function(module, exports) {
 
 	/**
@@ -27035,10 +33945,10 @@
 
 
 /***/ },
-/* 200 */
+/* 211 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isObject = __webpack_require__(201);
+	var isObject = __webpack_require__(212);
 
 	/** `Object#toString` result references. */
 	var funcTag = '[object Function]',
@@ -27084,7 +33994,7 @@
 
 
 /***/ },
-/* 201 */
+/* 212 */
 /***/ function(module, exports) {
 
 	/**
@@ -27121,7 +34031,7 @@
 
 
 /***/ },
-/* 202 */
+/* 213 */
 /***/ function(module, exports) {
 
 	/** Used as references for various `Number` constants. */
@@ -27163,7 +34073,7 @@
 
 
 /***/ },
-/* 203 */
+/* 214 */
 /***/ function(module, exports) {
 
 	/** Used as references for various `Number` constants. */
@@ -27190,11 +34100,11 @@
 
 
 /***/ },
-/* 204 */
+/* 215 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var apply = __webpack_require__(205),
-	    toInteger = __webpack_require__(206);
+	var apply = __webpack_require__(216),
+	    toInteger = __webpack_require__(217);
 
 	/** Used as the `TypeError` message for "Functions" methods. */
 	var FUNC_ERROR_TEXT = 'Expected a function';
@@ -27260,7 +34170,7 @@
 
 
 /***/ },
-/* 205 */
+/* 216 */
 /***/ function(module, exports) {
 
 	/**
@@ -27288,10 +34198,10 @@
 
 
 /***/ },
-/* 206 */
+/* 217 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var toNumber = __webpack_require__(207);
+	var toNumber = __webpack_require__(218);
 
 	/** Used as references for various `Number` constants. */
 	var INFINITY = 1 / 0,
@@ -27340,12 +34250,12 @@
 
 
 /***/ },
-/* 207 */
+/* 218 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isFunction = __webpack_require__(200),
-	    isObject = __webpack_require__(201),
-	    isSymbol = __webpack_require__(208);
+	var isFunction = __webpack_require__(211),
+	    isObject = __webpack_require__(212),
+	    isSymbol = __webpack_require__(219);
 
 	/** Used as references for various `Number` constants. */
 	var NAN = 0 / 0;
@@ -27413,10 +34323,10 @@
 
 
 /***/ },
-/* 208 */
+/* 219 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isObjectLike = __webpack_require__(209);
+	var isObjectLike = __webpack_require__(220);
 
 	/** `Object#toString` result references. */
 	var symbolTag = '[object Symbol]';
@@ -27458,7 +34368,7 @@
 
 
 /***/ },
-/* 209 */
+/* 220 */
 /***/ function(module, exports) {
 
 	/**
@@ -27493,7 +34403,7 @@
 
 
 /***/ },
-/* 210 */
+/* 221 */
 /***/ function(module, exports) {
 
 	/** Used for built-in method references. */
@@ -27517,15 +34427,15 @@
 
 
 /***/ },
-/* 211 */
+/* 222 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseHas = __webpack_require__(212),
-	    baseKeys = __webpack_require__(214),
-	    indexKeys = __webpack_require__(215),
-	    isArrayLike = __webpack_require__(197),
-	    isIndex = __webpack_require__(203),
-	    isPrototype = __webpack_require__(210);
+	var baseHas = __webpack_require__(223),
+	    baseKeys = __webpack_require__(225),
+	    indexKeys = __webpack_require__(226),
+	    isArrayLike = __webpack_require__(208),
+	    isIndex = __webpack_require__(214),
+	    isPrototype = __webpack_require__(221);
 
 	/**
 	 * Creates an array of the own enumerable property names of `object`.
@@ -27579,10 +34489,10 @@
 
 
 /***/ },
-/* 212 */
+/* 223 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var getPrototype = __webpack_require__(213);
+	var getPrototype = __webpack_require__(224);
 
 	/** Used for built-in method references. */
 	var objectProto = Object.prototype;
@@ -27610,7 +34520,7 @@
 
 
 /***/ },
-/* 213 */
+/* 224 */
 /***/ function(module, exports) {
 
 	/* Built-in method references for those with the same name as other `lodash` methods. */
@@ -27631,7 +34541,7 @@
 
 
 /***/ },
-/* 214 */
+/* 225 */
 /***/ function(module, exports) {
 
 	/* Built-in method references for those with the same name as other `lodash` methods. */
@@ -27653,14 +34563,14 @@
 
 
 /***/ },
-/* 215 */
+/* 226 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseTimes = __webpack_require__(216),
-	    isArguments = __webpack_require__(217),
-	    isArray = __webpack_require__(219),
-	    isLength = __webpack_require__(202),
-	    isString = __webpack_require__(220);
+	var baseTimes = __webpack_require__(227),
+	    isArguments = __webpack_require__(228),
+	    isArray = __webpack_require__(230),
+	    isLength = __webpack_require__(213),
+	    isString = __webpack_require__(231);
 
 	/**
 	 * Creates an array of index keys for `object` values of arrays,
@@ -27683,7 +34593,7 @@
 
 
 /***/ },
-/* 216 */
+/* 227 */
 /***/ function(module, exports) {
 
 	/**
@@ -27709,10 +34619,10 @@
 
 
 /***/ },
-/* 217 */
+/* 228 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isArrayLikeObject = __webpack_require__(218);
+	var isArrayLikeObject = __webpack_require__(229);
 
 	/** `Object#toString` result references. */
 	var argsTag = '[object Arguments]';
@@ -27761,11 +34671,11 @@
 
 
 /***/ },
-/* 218 */
+/* 229 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isArrayLike = __webpack_require__(197),
-	    isObjectLike = __webpack_require__(209);
+	var isArrayLike = __webpack_require__(208),
+	    isObjectLike = __webpack_require__(220);
 
 	/**
 	 * This method is like `_.isArrayLike` except that it also checks if `value`
@@ -27800,7 +34710,7 @@
 
 
 /***/ },
-/* 219 */
+/* 230 */
 /***/ function(module, exports) {
 
 	/**
@@ -27834,11 +34744,11 @@
 
 
 /***/ },
-/* 220 */
+/* 231 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isArray = __webpack_require__(219),
-	    isObjectLike = __webpack_require__(209);
+	var isArray = __webpack_require__(230),
+	    isObjectLike = __webpack_require__(220);
 
 	/** `Object#toString` result references. */
 	var stringTag = '[object String]';
@@ -27880,20 +34790,20 @@
 
 
 /***/ },
-/* 221 */
+/* 232 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
 	(function() {
 	  var XMLBuilder, XMLDeclaration, XMLDocType, XMLElement, XMLStringifier;
 
-	  XMLStringifier = __webpack_require__(222);
+	  XMLStringifier = __webpack_require__(233);
 
-	  XMLDeclaration = __webpack_require__(223);
+	  XMLDeclaration = __webpack_require__(234);
 
-	  XMLDocType = __webpack_require__(315);
+	  XMLDocType = __webpack_require__(326);
 
-	  XMLElement = __webpack_require__(244);
+	  XMLElement = __webpack_require__(255);
 
 	  module.exports = XMLBuilder = (function() {
 	    function XMLBuilder(name, options) {
@@ -27955,7 +34865,7 @@
 
 
 /***/ },
-/* 222 */
+/* 233 */
 /***/ function(module, exports) {
 
 	// Generated by CoffeeScript 1.9.1
@@ -28131,7 +35041,7 @@
 
 
 /***/ },
-/* 223 */
+/* 234 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
@@ -28140,11 +35050,11 @@
 	    extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
 	    hasProp = {}.hasOwnProperty;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
-	  isObject = __webpack_require__(201);
+	  isObject = __webpack_require__(212);
 
-	  XMLNode = __webpack_require__(227);
+	  XMLNode = __webpack_require__(238);
 
 	  module.exports = XMLDeclaration = (function(superClass) {
 	    extend(XMLDeclaration, superClass);
@@ -28202,11 +35112,11 @@
 
 
 /***/ },
-/* 224 */
+/* 235 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseAssign = __webpack_require__(225),
-	    baseCreate = __webpack_require__(226);
+	var baseAssign = __webpack_require__(236),
+	    baseCreate = __webpack_require__(237);
 
 	/**
 	 * Creates an object that inherits from the `prototype` object. If a
@@ -28251,11 +35161,11 @@
 
 
 /***/ },
-/* 225 */
+/* 236 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var copyObject = __webpack_require__(193),
-	    keys = __webpack_require__(211);
+	var copyObject = __webpack_require__(204),
+	    keys = __webpack_require__(222);
 
 	/**
 	 * The base implementation of `_.assign` without support for multiple sources
@@ -28274,10 +35184,10 @@
 
 
 /***/ },
-/* 226 */
+/* 237 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isObject = __webpack_require__(201);
+	var isObject = __webpack_require__(212);
 
 	/** Built-in value references. */
 	var objectCreate = Object.create;
@@ -28298,7 +35208,7 @@
 
 
 /***/ },
-/* 227 */
+/* 238 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
@@ -28306,11 +35216,11 @@
 	  var XMLCData, XMLComment, XMLDeclaration, XMLDocType, XMLElement, XMLNode, XMLRaw, XMLText, isEmpty, isFunction, isObject,
 	    hasProp = {}.hasOwnProperty;
 
-	  isObject = __webpack_require__(201);
+	  isObject = __webpack_require__(212);
 
-	  isFunction = __webpack_require__(200);
+	  isFunction = __webpack_require__(211);
 
-	  isEmpty = __webpack_require__(228);
+	  isEmpty = __webpack_require__(239);
 
 	  XMLElement = null;
 
@@ -28332,13 +35242,13 @@
 	      this.options = this.parent.options;
 	      this.stringify = this.parent.stringify;
 	      if (XMLElement === null) {
-	        XMLElement = __webpack_require__(244);
-	        XMLCData = __webpack_require__(313);
-	        XMLComment = __webpack_require__(314);
-	        XMLDeclaration = __webpack_require__(223);
-	        XMLDocType = __webpack_require__(315);
-	        XMLRaw = __webpack_require__(320);
-	        XMLText = __webpack_require__(321);
+	        XMLElement = __webpack_require__(255);
+	        XMLCData = __webpack_require__(324);
+	        XMLComment = __webpack_require__(325);
+	        XMLDeclaration = __webpack_require__(234);
+	        XMLDocType = __webpack_require__(326);
+	        XMLRaw = __webpack_require__(331);
+	        XMLText = __webpack_require__(332);
 	      }
 	    }
 
@@ -28635,18 +35545,18 @@
 
 
 /***/ },
-/* 228 */
+/* 239 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var getTag = __webpack_require__(229),
-	    isArguments = __webpack_require__(217),
-	    isArray = __webpack_require__(219),
-	    isArrayLike = __webpack_require__(197),
-	    isBuffer = __webpack_require__(242),
-	    isFunction = __webpack_require__(200),
-	    isObjectLike = __webpack_require__(209),
-	    isString = __webpack_require__(220),
-	    keys = __webpack_require__(211);
+	var getTag = __webpack_require__(240),
+	    isArguments = __webpack_require__(228),
+	    isArray = __webpack_require__(230),
+	    isArrayLike = __webpack_require__(208),
+	    isBuffer = __webpack_require__(253),
+	    isFunction = __webpack_require__(211),
+	    isObjectLike = __webpack_require__(220),
+	    isString = __webpack_require__(231),
+	    keys = __webpack_require__(222);
 
 	/** `Object#toString` result references. */
 	var mapTag = '[object Map]',
@@ -28721,15 +35631,15 @@
 
 
 /***/ },
-/* 229 */
+/* 240 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var DataView = __webpack_require__(230),
-	    Map = __webpack_require__(238),
-	    Promise = __webpack_require__(239),
-	    Set = __webpack_require__(240),
-	    WeakMap = __webpack_require__(241),
-	    toSource = __webpack_require__(234);
+	var DataView = __webpack_require__(241),
+	    Map = __webpack_require__(249),
+	    Promise = __webpack_require__(250),
+	    Set = __webpack_require__(251),
+	    WeakMap = __webpack_require__(252),
+	    toSource = __webpack_require__(245);
 
 	/** `Object#toString` result references. */
 	var mapTag = '[object Map]',
@@ -28797,11 +35707,11 @@
 
 
 /***/ },
-/* 230 */
+/* 241 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var getNative = __webpack_require__(231),
-	    root = __webpack_require__(235);
+	var getNative = __webpack_require__(242),
+	    root = __webpack_require__(246);
 
 	/* Built-in method references that are verified to be native. */
 	var DataView = getNative(root, 'DataView');
@@ -28810,10 +35720,10 @@
 
 
 /***/ },
-/* 231 */
+/* 242 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isNative = __webpack_require__(232);
+	var isNative = __webpack_require__(243);
 
 	/**
 	 * Gets the native function at `key` of `object`.
@@ -28832,13 +35742,13 @@
 
 
 /***/ },
-/* 232 */
+/* 243 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isFunction = __webpack_require__(200),
-	    isHostObject = __webpack_require__(233),
-	    isObject = __webpack_require__(201),
-	    toSource = __webpack_require__(234);
+	var isFunction = __webpack_require__(211),
+	    isHostObject = __webpack_require__(244),
+	    isObject = __webpack_require__(212),
+	    toSource = __webpack_require__(245);
 
 	/**
 	 * Used to match `RegExp`
@@ -28894,7 +35804,7 @@
 
 
 /***/ },
-/* 233 */
+/* 244 */
 /***/ function(module, exports) {
 
 	/**
@@ -28920,7 +35830,7 @@
 
 
 /***/ },
-/* 234 */
+/* 245 */
 /***/ function(module, exports) {
 
 	/** Used to resolve the decompiled source of functions. */
@@ -28949,10 +35859,10 @@
 
 
 /***/ },
-/* 235 */
+/* 246 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(module, global) {var checkGlobal = __webpack_require__(237);
+	/* WEBPACK VAR INJECTION */(function(module, global) {var checkGlobal = __webpack_require__(248);
 
 	/** Used to determine if values are of the language type `Object`. */
 	var objectTypes = {
@@ -28994,10 +35904,10 @@
 
 	module.exports = root;
 
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(236)(module), (function() { return this; }())))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(247)(module), (function() { return this; }())))
 
 /***/ },
-/* 236 */
+/* 247 */
 /***/ function(module, exports) {
 
 	module.exports = function(module) {
@@ -29013,7 +35923,7 @@
 
 
 /***/ },
-/* 237 */
+/* 248 */
 /***/ function(module, exports) {
 
 	/**
@@ -29031,11 +35941,11 @@
 
 
 /***/ },
-/* 238 */
+/* 249 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var getNative = __webpack_require__(231),
-	    root = __webpack_require__(235);
+	var getNative = __webpack_require__(242),
+	    root = __webpack_require__(246);
 
 	/* Built-in method references that are verified to be native. */
 	var Map = getNative(root, 'Map');
@@ -29044,11 +35954,11 @@
 
 
 /***/ },
-/* 239 */
+/* 250 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var getNative = __webpack_require__(231),
-	    root = __webpack_require__(235);
+	var getNative = __webpack_require__(242),
+	    root = __webpack_require__(246);
 
 	/* Built-in method references that are verified to be native. */
 	var Promise = getNative(root, 'Promise');
@@ -29057,11 +35967,11 @@
 
 
 /***/ },
-/* 240 */
+/* 251 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var getNative = __webpack_require__(231),
-	    root = __webpack_require__(235);
+	var getNative = __webpack_require__(242),
+	    root = __webpack_require__(246);
 
 	/* Built-in method references that are verified to be native. */
 	var Set = getNative(root, 'Set');
@@ -29070,11 +35980,11 @@
 
 
 /***/ },
-/* 241 */
+/* 252 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var getNative = __webpack_require__(231),
-	    root = __webpack_require__(235);
+	var getNative = __webpack_require__(242),
+	    root = __webpack_require__(246);
 
 	/* Built-in method references that are verified to be native. */
 	var WeakMap = getNative(root, 'WeakMap');
@@ -29083,11 +35993,11 @@
 
 
 /***/ },
-/* 242 */
+/* 253 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(module) {var constant = __webpack_require__(243),
-	    root = __webpack_require__(235);
+	/* WEBPACK VAR INJECTION */(function(module) {var constant = __webpack_require__(254),
+	    root = __webpack_require__(246);
 
 	/** Used to determine if values are of the language type `Object`. */
 	var objectTypes = {
@@ -29136,10 +36046,10 @@
 
 	module.exports = isBuffer;
 
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(236)(module)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(247)(module)))
 
 /***/ },
-/* 243 */
+/* 254 */
 /***/ function(module, exports) {
 
 	/**
@@ -29169,7 +36079,7 @@
 
 
 /***/ },
-/* 244 */
+/* 255 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
@@ -29178,19 +36088,19 @@
 	    extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
 	    hasProp = {}.hasOwnProperty;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
-	  isObject = __webpack_require__(201);
+	  isObject = __webpack_require__(212);
 
-	  isFunction = __webpack_require__(200);
+	  isFunction = __webpack_require__(211);
 
-	  every = __webpack_require__(245);
+	  every = __webpack_require__(256);
 
-	  XMLNode = __webpack_require__(227);
+	  XMLNode = __webpack_require__(238);
 
-	  XMLAttribute = __webpack_require__(311);
+	  XMLAttribute = __webpack_require__(322);
 
-	  XMLProcessingInstruction = __webpack_require__(312);
+	  XMLProcessingInstruction = __webpack_require__(323);
 
 	  module.exports = XMLElement = (function(superClass) {
 	    extend(XMLElement, superClass);
@@ -29387,14 +36297,14 @@
 
 
 /***/ },
-/* 245 */
+/* 256 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var arrayEvery = __webpack_require__(246),
-	    baseEvery = __webpack_require__(247),
-	    baseIteratee = __webpack_require__(253),
-	    isArray = __webpack_require__(219),
-	    isIterateeCall = __webpack_require__(196);
+	var arrayEvery = __webpack_require__(257),
+	    baseEvery = __webpack_require__(258),
+	    baseIteratee = __webpack_require__(264),
+	    isArray = __webpack_require__(230),
+	    isIterateeCall = __webpack_require__(207);
 
 	/**
 	 * Checks if `predicate` returns truthy for **all** elements of `collection`.
@@ -29445,7 +36355,7 @@
 
 
 /***/ },
-/* 246 */
+/* 257 */
 /***/ function(module, exports) {
 
 	/**
@@ -29474,10 +36384,10 @@
 
 
 /***/ },
-/* 247 */
+/* 258 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseEach = __webpack_require__(248);
+	var baseEach = __webpack_require__(259);
 
 	/**
 	 * The base implementation of `_.every` without support for iteratee shorthands.
@@ -29501,11 +36411,11 @@
 
 
 /***/ },
-/* 248 */
+/* 259 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseForOwn = __webpack_require__(249),
-	    createBaseEach = __webpack_require__(252);
+	var baseForOwn = __webpack_require__(260),
+	    createBaseEach = __webpack_require__(263);
 
 	/**
 	 * The base implementation of `_.forEach` without support for iteratee shorthands.
@@ -29521,11 +36431,11 @@
 
 
 /***/ },
-/* 249 */
+/* 260 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseFor = __webpack_require__(250),
-	    keys = __webpack_require__(211);
+	var baseFor = __webpack_require__(261),
+	    keys = __webpack_require__(222);
 
 	/**
 	 * The base implementation of `_.forOwn` without support for iteratee shorthands.
@@ -29543,10 +36453,10 @@
 
 
 /***/ },
-/* 250 */
+/* 261 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var createBaseFor = __webpack_require__(251);
+	var createBaseFor = __webpack_require__(262);
 
 	/**
 	 * The base implementation of `baseForOwn` which iterates over `object`
@@ -29565,7 +36475,7 @@
 
 
 /***/ },
-/* 251 */
+/* 262 */
 /***/ function(module, exports) {
 
 	/**
@@ -29596,10 +36506,10 @@
 
 
 /***/ },
-/* 252 */
+/* 263 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isArrayLike = __webpack_require__(197);
+	var isArrayLike = __webpack_require__(208);
 
 	/**
 	 * Creates a `baseEach` or `baseEachRight` function.
@@ -29634,14 +36544,14 @@
 
 
 /***/ },
-/* 253 */
+/* 264 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseMatches = __webpack_require__(254),
-	    baseMatchesProperty = __webpack_require__(297),
-	    identity = __webpack_require__(308),
-	    isArray = __webpack_require__(219),
-	    property = __webpack_require__(309);
+	var baseMatches = __webpack_require__(265),
+	    baseMatchesProperty = __webpack_require__(308),
+	    identity = __webpack_require__(319),
+	    isArray = __webpack_require__(230),
+	    property = __webpack_require__(320);
 
 	/**
 	 * The base implementation of `_.iteratee`.
@@ -29671,12 +36581,12 @@
 
 
 /***/ },
-/* 254 */
+/* 265 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseIsMatch = __webpack_require__(255),
-	    getMatchData = __webpack_require__(291),
-	    matchesStrictComparable = __webpack_require__(296);
+	var baseIsMatch = __webpack_require__(266),
+	    getMatchData = __webpack_require__(302),
+	    matchesStrictComparable = __webpack_require__(307);
 
 	/**
 	 * The base implementation of `_.matches` which doesn't clone `source`.
@@ -29699,11 +36609,11 @@
 
 
 /***/ },
-/* 255 */
+/* 266 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Stack = __webpack_require__(256),
-	    baseIsEqual = __webpack_require__(280);
+	var Stack = __webpack_require__(267),
+	    baseIsEqual = __webpack_require__(291);
 
 	/** Used to compose bitmasks for comparison styles. */
 	var UNORDERED_COMPARE_FLAG = 1,
@@ -29767,14 +36677,14 @@
 
 
 /***/ },
-/* 256 */
+/* 267 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var stackClear = __webpack_require__(257),
-	    stackDelete = __webpack_require__(258),
-	    stackGet = __webpack_require__(261),
-	    stackHas = __webpack_require__(263),
-	    stackSet = __webpack_require__(265);
+	var stackClear = __webpack_require__(268),
+	    stackDelete = __webpack_require__(269),
+	    stackGet = __webpack_require__(272),
+	    stackHas = __webpack_require__(274),
+	    stackSet = __webpack_require__(276);
 
 	/**
 	 * Creates a stack cache object to store key-value pairs.
@@ -29805,7 +36715,7 @@
 
 
 /***/ },
-/* 257 */
+/* 268 */
 /***/ function(module, exports) {
 
 	/**
@@ -29823,10 +36733,10 @@
 
 
 /***/ },
-/* 258 */
+/* 269 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assocDelete = __webpack_require__(259);
+	var assocDelete = __webpack_require__(270);
 
 	/**
 	 * Removes `key` and its value from the stack.
@@ -29848,10 +36758,10 @@
 
 
 /***/ },
-/* 259 */
+/* 270 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assocIndexOf = __webpack_require__(260);
+	var assocIndexOf = __webpack_require__(271);
 
 	/** Used for built-in method references. */
 	var arrayProto = Array.prototype;
@@ -29885,10 +36795,10 @@
 
 
 /***/ },
-/* 260 */
+/* 271 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var eq = __webpack_require__(192);
+	var eq = __webpack_require__(203);
 
 	/**
 	 * Gets the index at which the `key` is found in `array` of key-value pairs.
@@ -29912,10 +36822,10 @@
 
 
 /***/ },
-/* 261 */
+/* 272 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assocGet = __webpack_require__(262);
+	var assocGet = __webpack_require__(273);
 
 	/**
 	 * Gets the stack value for `key`.
@@ -29937,10 +36847,10 @@
 
 
 /***/ },
-/* 262 */
+/* 273 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assocIndexOf = __webpack_require__(260);
+	var assocIndexOf = __webpack_require__(271);
 
 	/**
 	 * Gets the associative array value for `key`.
@@ -29959,10 +36869,10 @@
 
 
 /***/ },
-/* 263 */
+/* 274 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assocHas = __webpack_require__(264);
+	var assocHas = __webpack_require__(275);
 
 	/**
 	 * Checks if a stack value for `key` exists.
@@ -29984,10 +36894,10 @@
 
 
 /***/ },
-/* 264 */
+/* 275 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assocIndexOf = __webpack_require__(260);
+	var assocIndexOf = __webpack_require__(271);
 
 	/**
 	 * Checks if an associative array value for `key` exists.
@@ -30005,11 +36915,11 @@
 
 
 /***/ },
-/* 265 */
+/* 276 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var MapCache = __webpack_require__(266),
-	    assocSet = __webpack_require__(278);
+	var MapCache = __webpack_require__(277),
+	    assocSet = __webpack_require__(289);
 
 	/** Used as the size to enable large array optimizations. */
 	var LARGE_ARRAY_SIZE = 200;
@@ -30047,14 +36957,14 @@
 
 
 /***/ },
-/* 266 */
+/* 277 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var mapClear = __webpack_require__(267),
-	    mapDelete = __webpack_require__(270),
-	    mapGet = __webpack_require__(274),
-	    mapHas = __webpack_require__(276),
-	    mapSet = __webpack_require__(277);
+	var mapClear = __webpack_require__(278),
+	    mapDelete = __webpack_require__(281),
+	    mapGet = __webpack_require__(285),
+	    mapHas = __webpack_require__(287),
+	    mapSet = __webpack_require__(288);
 
 	/**
 	 * Creates a map cache object to store key-value pairs.
@@ -30085,11 +36995,11 @@
 
 
 /***/ },
-/* 267 */
+/* 278 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Hash = __webpack_require__(268),
-	    Map = __webpack_require__(238);
+	var Hash = __webpack_require__(279),
+	    Map = __webpack_require__(249);
 
 	/**
 	 * Removes all key-value entries from the map.
@@ -30110,10 +37020,10 @@
 
 
 /***/ },
-/* 268 */
+/* 279 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var nativeCreate = __webpack_require__(269);
+	var nativeCreate = __webpack_require__(280);
 
 	/** Used for built-in method references. */
 	var objectProto = Object.prototype;
@@ -30134,10 +37044,10 @@
 
 
 /***/ },
-/* 269 */
+/* 280 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var getNative = __webpack_require__(231);
+	var getNative = __webpack_require__(242);
 
 	/* Built-in method references that are verified to be native. */
 	var nativeCreate = getNative(Object, 'create');
@@ -30146,13 +37056,13 @@
 
 
 /***/ },
-/* 270 */
+/* 281 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Map = __webpack_require__(238),
-	    assocDelete = __webpack_require__(259),
-	    hashDelete = __webpack_require__(271),
-	    isKeyable = __webpack_require__(273);
+	var Map = __webpack_require__(249),
+	    assocDelete = __webpack_require__(270),
+	    hashDelete = __webpack_require__(282),
+	    isKeyable = __webpack_require__(284);
 
 	/**
 	 * Removes `key` and its value from the map.
@@ -30175,10 +37085,10 @@
 
 
 /***/ },
-/* 271 */
+/* 282 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var hashHas = __webpack_require__(272);
+	var hashHas = __webpack_require__(283);
 
 	/**
 	 * Removes `key` and its value from the hash.
@@ -30196,10 +37106,10 @@
 
 
 /***/ },
-/* 272 */
+/* 283 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var nativeCreate = __webpack_require__(269);
+	var nativeCreate = __webpack_require__(280);
 
 	/** Used for built-in method references. */
 	var objectProto = Object.prototype;
@@ -30223,7 +37133,7 @@
 
 
 /***/ },
-/* 273 */
+/* 284 */
 /***/ function(module, exports) {
 
 	/**
@@ -30243,13 +37153,13 @@
 
 
 /***/ },
-/* 274 */
+/* 285 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Map = __webpack_require__(238),
-	    assocGet = __webpack_require__(262),
-	    hashGet = __webpack_require__(275),
-	    isKeyable = __webpack_require__(273);
+	var Map = __webpack_require__(249),
+	    assocGet = __webpack_require__(273),
+	    hashGet = __webpack_require__(286),
+	    isKeyable = __webpack_require__(284);
 
 	/**
 	 * Gets the map value for `key`.
@@ -30272,10 +37182,10 @@
 
 
 /***/ },
-/* 275 */
+/* 286 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var nativeCreate = __webpack_require__(269);
+	var nativeCreate = __webpack_require__(280);
 
 	/** Used to stand-in for `undefined` hash values. */
 	var HASH_UNDEFINED = '__lodash_hash_undefined__';
@@ -30306,13 +37216,13 @@
 
 
 /***/ },
-/* 276 */
+/* 287 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Map = __webpack_require__(238),
-	    assocHas = __webpack_require__(264),
-	    hashHas = __webpack_require__(272),
-	    isKeyable = __webpack_require__(273);
+	var Map = __webpack_require__(249),
+	    assocHas = __webpack_require__(275),
+	    hashHas = __webpack_require__(283),
+	    isKeyable = __webpack_require__(284);
 
 	/**
 	 * Checks if a map value for `key` exists.
@@ -30335,13 +37245,13 @@
 
 
 /***/ },
-/* 277 */
+/* 288 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Map = __webpack_require__(238),
-	    assocSet = __webpack_require__(278),
-	    hashSet = __webpack_require__(279),
-	    isKeyable = __webpack_require__(273);
+	var Map = __webpack_require__(249),
+	    assocSet = __webpack_require__(289),
+	    hashSet = __webpack_require__(290),
+	    isKeyable = __webpack_require__(284);
 
 	/**
 	 * Sets the map `key` to `value`.
@@ -30369,10 +37279,10 @@
 
 
 /***/ },
-/* 278 */
+/* 289 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var assocIndexOf = __webpack_require__(260);
+	var assocIndexOf = __webpack_require__(271);
 
 	/**
 	 * Sets the associative array `key` to `value`.
@@ -30395,10 +37305,10 @@
 
 
 /***/ },
-/* 279 */
+/* 290 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var nativeCreate = __webpack_require__(269);
+	var nativeCreate = __webpack_require__(280);
 
 	/** Used to stand-in for `undefined` hash values. */
 	var HASH_UNDEFINED = '__lodash_hash_undefined__';
@@ -30419,12 +37329,12 @@
 
 
 /***/ },
-/* 280 */
+/* 291 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseIsEqualDeep = __webpack_require__(281),
-	    isObject = __webpack_require__(201),
-	    isObjectLike = __webpack_require__(209);
+	var baseIsEqualDeep = __webpack_require__(292),
+	    isObject = __webpack_require__(212),
+	    isObjectLike = __webpack_require__(220);
 
 	/**
 	 * The base implementation of `_.isEqual` which supports partial comparisons
@@ -30455,17 +37365,17 @@
 
 
 /***/ },
-/* 281 */
+/* 292 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Stack = __webpack_require__(256),
-	    equalArrays = __webpack_require__(282),
-	    equalByTag = __webpack_require__(284),
-	    equalObjects = __webpack_require__(289),
-	    getTag = __webpack_require__(229),
-	    isArray = __webpack_require__(219),
-	    isHostObject = __webpack_require__(233),
-	    isTypedArray = __webpack_require__(290);
+	var Stack = __webpack_require__(267),
+	    equalArrays = __webpack_require__(293),
+	    equalByTag = __webpack_require__(295),
+	    equalObjects = __webpack_require__(300),
+	    getTag = __webpack_require__(240),
+	    isArray = __webpack_require__(230),
+	    isHostObject = __webpack_require__(244),
+	    isTypedArray = __webpack_require__(301);
 
 	/** Used to compose bitmasks for comparison styles. */
 	var PARTIAL_COMPARE_FLAG = 2;
@@ -30543,10 +37453,10 @@
 
 
 /***/ },
-/* 282 */
+/* 293 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var arraySome = __webpack_require__(283);
+	var arraySome = __webpack_require__(294);
 
 	/** Used to compose bitmasks for comparison styles. */
 	var UNORDERED_COMPARE_FLAG = 1,
@@ -30626,7 +37536,7 @@
 
 
 /***/ },
-/* 283 */
+/* 294 */
 /***/ function(module, exports) {
 
 	/**
@@ -30655,14 +37565,14 @@
 
 
 /***/ },
-/* 284 */
+/* 295 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Symbol = __webpack_require__(285),
-	    Uint8Array = __webpack_require__(286),
-	    equalArrays = __webpack_require__(282),
-	    mapToArray = __webpack_require__(287),
-	    setToArray = __webpack_require__(288);
+	var Symbol = __webpack_require__(296),
+	    Uint8Array = __webpack_require__(297),
+	    equalArrays = __webpack_require__(293),
+	    mapToArray = __webpack_require__(298),
+	    setToArray = __webpack_require__(299);
 
 	/** Used to compose bitmasks for comparison styles. */
 	var UNORDERED_COMPARE_FLAG = 1,
@@ -30775,10 +37685,10 @@
 
 
 /***/ },
-/* 285 */
+/* 296 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var root = __webpack_require__(235);
+	var root = __webpack_require__(246);
 
 	/** Built-in value references. */
 	var Symbol = root.Symbol;
@@ -30787,10 +37697,10 @@
 
 
 /***/ },
-/* 286 */
+/* 297 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var root = __webpack_require__(235);
+	var root = __webpack_require__(246);
 
 	/** Built-in value references. */
 	var Uint8Array = root.Uint8Array;
@@ -30799,7 +37709,7 @@
 
 
 /***/ },
-/* 287 */
+/* 298 */
 /***/ function(module, exports) {
 
 	/**
@@ -30823,7 +37733,7 @@
 
 
 /***/ },
-/* 288 */
+/* 299 */
 /***/ function(module, exports) {
 
 	/**
@@ -30847,11 +37757,11 @@
 
 
 /***/ },
-/* 289 */
+/* 300 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseHas = __webpack_require__(212),
-	    keys = __webpack_require__(211);
+	var baseHas = __webpack_require__(223),
+	    keys = __webpack_require__(222);
 
 	/** Used to compose bitmasks for comparison styles. */
 	var PARTIAL_COMPARE_FLAG = 2;
@@ -30936,11 +37846,11 @@
 
 
 /***/ },
-/* 290 */
+/* 301 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isLength = __webpack_require__(202),
-	    isObjectLike = __webpack_require__(209);
+	var isLength = __webpack_require__(213),
+	    isObjectLike = __webpack_require__(220);
 
 	/** `Object#toString` result references. */
 	var argsTag = '[object Arguments]',
@@ -31022,11 +37932,11 @@
 
 
 /***/ },
-/* 291 */
+/* 302 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isStrictComparable = __webpack_require__(292),
-	    toPairs = __webpack_require__(293);
+	var isStrictComparable = __webpack_require__(303),
+	    toPairs = __webpack_require__(304);
 
 	/**
 	 * Gets the property names, values, and compare flags of `object`.
@@ -31049,10 +37959,10 @@
 
 
 /***/ },
-/* 292 */
+/* 303 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isObject = __webpack_require__(201);
+	var isObject = __webpack_require__(212);
 
 	/**
 	 * Checks if `value` is suitable for strict equality comparisons, i.e. `===`.
@@ -31070,11 +37980,11 @@
 
 
 /***/ },
-/* 293 */
+/* 304 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseToPairs = __webpack_require__(294),
-	    keys = __webpack_require__(211);
+	var baseToPairs = __webpack_require__(305),
+	    keys = __webpack_require__(222);
 
 	/**
 	 * Creates an array of own enumerable string keyed-value pairs for `object`
@@ -31107,10 +38017,10 @@
 
 
 /***/ },
-/* 294 */
+/* 305 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var arrayMap = __webpack_require__(295);
+	var arrayMap = __webpack_require__(306);
 
 	/**
 	 * The base implementation of `_.toPairs` and `_.toPairsIn` which creates an array
@@ -31131,7 +38041,7 @@
 
 
 /***/ },
-/* 295 */
+/* 306 */
 /***/ function(module, exports) {
 
 	/**
@@ -31158,7 +38068,7 @@
 
 
 /***/ },
-/* 296 */
+/* 307 */
 /***/ function(module, exports) {
 
 	/**
@@ -31184,15 +38094,15 @@
 
 
 /***/ },
-/* 297 */
+/* 308 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseIsEqual = __webpack_require__(280),
-	    get = __webpack_require__(298),
-	    hasIn = __webpack_require__(305),
-	    isKey = __webpack_require__(304),
-	    isStrictComparable = __webpack_require__(292),
-	    matchesStrictComparable = __webpack_require__(296);
+	var baseIsEqual = __webpack_require__(291),
+	    get = __webpack_require__(309),
+	    hasIn = __webpack_require__(316),
+	    isKey = __webpack_require__(315),
+	    isStrictComparable = __webpack_require__(303),
+	    matchesStrictComparable = __webpack_require__(307);
 
 	/** Used to compose bitmasks for comparison styles. */
 	var UNORDERED_COMPARE_FLAG = 1,
@@ -31222,10 +38132,10 @@
 
 
 /***/ },
-/* 298 */
+/* 309 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseGet = __webpack_require__(299);
+	var baseGet = __webpack_require__(310);
 
 	/**
 	 * Gets the value at `path` of `object`. If the resolved value is
@@ -31261,11 +38171,11 @@
 
 
 /***/ },
-/* 299 */
+/* 310 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var castPath = __webpack_require__(300),
-	    isKey = __webpack_require__(304);
+	var castPath = __webpack_require__(311),
+	    isKey = __webpack_require__(315);
 
 	/**
 	 * The base implementation of `_.get` without support for default values.
@@ -31291,11 +38201,11 @@
 
 
 /***/ },
-/* 300 */
+/* 311 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isArray = __webpack_require__(219),
-	    stringToPath = __webpack_require__(301);
+	var isArray = __webpack_require__(230),
+	    stringToPath = __webpack_require__(312);
 
 	/**
 	 * Casts `value` to a path array if it's not one.
@@ -31312,11 +38222,11 @@
 
 
 /***/ },
-/* 301 */
+/* 312 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var memoize = __webpack_require__(302),
-	    toString = __webpack_require__(303);
+	var memoize = __webpack_require__(313),
+	    toString = __webpack_require__(314);
 
 	/** Used to match property names within property paths. */
 	var rePropName = /[^.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]/g;
@@ -31343,10 +38253,10 @@
 
 
 /***/ },
-/* 302 */
+/* 313 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var MapCache = __webpack_require__(266);
+	var MapCache = __webpack_require__(277);
 
 	/** Used as the `TypeError` message for "Functions" methods. */
 	var FUNC_ERROR_TEXT = 'Expected a function';
@@ -31422,11 +38332,11 @@
 
 
 /***/ },
-/* 303 */
+/* 314 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Symbol = __webpack_require__(285),
-	    isSymbol = __webpack_require__(208);
+	var Symbol = __webpack_require__(296),
+	    isSymbol = __webpack_require__(219);
 
 	/** Used as references for various `Number` constants. */
 	var INFINITY = 1 / 0;
@@ -31475,11 +38385,11 @@
 
 
 /***/ },
-/* 304 */
+/* 315 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isArray = __webpack_require__(219),
-	    isSymbol = __webpack_require__(208);
+	var isArray = __webpack_require__(230),
+	    isSymbol = __webpack_require__(219);
 
 	/** Used to match property names within property paths. */
 	var reIsDeepProp = /\.|\[(?:[^[\]]*|(["'])(?:(?!\1)[^\\]|\\.)*?\1)\]/,
@@ -31507,11 +38417,11 @@
 
 
 /***/ },
-/* 305 */
+/* 316 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseHasIn = __webpack_require__(306),
-	    hasPath = __webpack_require__(307);
+	var baseHasIn = __webpack_require__(317),
+	    hasPath = __webpack_require__(318);
 
 	/**
 	 * Checks if `path` is a direct or inherited property of `object`.
@@ -31547,7 +38457,7 @@
 
 
 /***/ },
-/* 306 */
+/* 317 */
 /***/ function(module, exports) {
 
 	/**
@@ -31566,16 +38476,16 @@
 
 
 /***/ },
-/* 307 */
+/* 318 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var castPath = __webpack_require__(300),
-	    isArguments = __webpack_require__(217),
-	    isArray = __webpack_require__(219),
-	    isIndex = __webpack_require__(203),
-	    isKey = __webpack_require__(304),
-	    isLength = __webpack_require__(202),
-	    isString = __webpack_require__(220);
+	var castPath = __webpack_require__(311),
+	    isArguments = __webpack_require__(228),
+	    isArray = __webpack_require__(230),
+	    isIndex = __webpack_require__(214),
+	    isKey = __webpack_require__(315),
+	    isLength = __webpack_require__(213),
+	    isString = __webpack_require__(231);
 
 	/**
 	 * Checks if `path` exists on `object`.
@@ -31612,7 +38522,7 @@
 
 
 /***/ },
-/* 308 */
+/* 319 */
 /***/ function(module, exports) {
 
 	/**
@@ -31639,12 +38549,12 @@
 
 
 /***/ },
-/* 309 */
+/* 320 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseProperty = __webpack_require__(199),
-	    basePropertyDeep = __webpack_require__(310),
-	    isKey = __webpack_require__(304);
+	var baseProperty = __webpack_require__(210),
+	    basePropertyDeep = __webpack_require__(321),
+	    isKey = __webpack_require__(315);
 
 	/**
 	 * Creates a function that returns the value at `path` of a given object.
@@ -31676,10 +38586,10 @@
 
 
 /***/ },
-/* 310 */
+/* 321 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseGet = __webpack_require__(299);
+	var baseGet = __webpack_require__(310);
 
 	/**
 	 * A specialized version of `baseProperty` which supports deep paths.
@@ -31698,14 +38608,14 @@
 
 
 /***/ },
-/* 311 */
+/* 322 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
 	(function() {
 	  var XMLAttribute, create;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
 	  module.exports = XMLAttribute = (function() {
 	    function XMLAttribute(parent, name, value) {
@@ -31736,14 +38646,14 @@
 
 
 /***/ },
-/* 312 */
+/* 323 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
 	(function() {
 	  var XMLProcessingInstruction, create;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
 	  module.exports = XMLProcessingInstruction = (function() {
 	    function XMLProcessingInstruction(parent, target, value) {
@@ -31793,7 +38703,7 @@
 
 
 /***/ },
-/* 313 */
+/* 324 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
@@ -31802,9 +38712,9 @@
 	    extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
 	    hasProp = {}.hasOwnProperty;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
-	  XMLNode = __webpack_require__(227);
+	  XMLNode = __webpack_require__(238);
 
 	  module.exports = XMLCData = (function(superClass) {
 	    extend(XMLCData, superClass);
@@ -31848,7 +38758,7 @@
 
 
 /***/ },
-/* 314 */
+/* 325 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
@@ -31857,9 +38767,9 @@
 	    extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
 	    hasProp = {}.hasOwnProperty;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
-	  XMLNode = __webpack_require__(227);
+	  XMLNode = __webpack_require__(238);
 
 	  module.exports = XMLComment = (function(superClass) {
 	    extend(XMLComment, superClass);
@@ -31903,30 +38813,30 @@
 
 
 /***/ },
-/* 315 */
+/* 326 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
 	(function() {
 	  var XMLCData, XMLComment, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDocType, XMLProcessingInstruction, create, isObject;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
-	  isObject = __webpack_require__(201);
+	  isObject = __webpack_require__(212);
 
-	  XMLCData = __webpack_require__(313);
+	  XMLCData = __webpack_require__(324);
 
-	  XMLComment = __webpack_require__(314);
+	  XMLComment = __webpack_require__(325);
 
-	  XMLDTDAttList = __webpack_require__(316);
+	  XMLDTDAttList = __webpack_require__(327);
 
-	  XMLDTDEntity = __webpack_require__(317);
+	  XMLDTDEntity = __webpack_require__(328);
 
-	  XMLDTDElement = __webpack_require__(318);
+	  XMLDTDElement = __webpack_require__(329);
 
-	  XMLDTDNotation = __webpack_require__(319);
+	  XMLDTDNotation = __webpack_require__(330);
 
-	  XMLProcessingInstruction = __webpack_require__(312);
+	  XMLProcessingInstruction = __webpack_require__(323);
 
 	  module.exports = XMLDocType = (function() {
 	    function XMLDocType(parent, pubID, sysID) {
@@ -32097,14 +39007,14 @@
 
 
 /***/ },
-/* 316 */
+/* 327 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
 	(function() {
 	  var XMLDTDAttList, create;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
 	  module.exports = XMLDTDAttList = (function() {
 	    function XMLDTDAttList(parent, elementName, attributeName, attributeType, defaultValueType, defaultValue) {
@@ -32171,16 +39081,16 @@
 
 
 /***/ },
-/* 317 */
+/* 328 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
 	(function() {
 	  var XMLDTDEntity, create, isObject;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
-	  isObject = __webpack_require__(201);
+	  isObject = __webpack_require__(212);
 
 	  module.exports = XMLDTDEntity = (function() {
 	    function XMLDTDEntity(parent, pe, name, value) {
@@ -32261,14 +39171,14 @@
 
 
 /***/ },
-/* 318 */
+/* 329 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
 	(function() {
 	  var XMLDTDElement, create;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
 	  module.exports = XMLDTDElement = (function() {
 	    function XMLDTDElement(parent, name, value) {
@@ -32313,14 +39223,14 @@
 
 
 /***/ },
-/* 319 */
+/* 330 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
 	(function() {
 	  var XMLDTDNotation, create;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
 	  module.exports = XMLDTDNotation = (function() {
 	    function XMLDTDNotation(parent, name, value) {
@@ -32375,7 +39285,7 @@
 
 
 /***/ },
-/* 320 */
+/* 331 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
@@ -32384,9 +39294,9 @@
 	    extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
 	    hasProp = {}.hasOwnProperty;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
-	  XMLNode = __webpack_require__(227);
+	  XMLNode = __webpack_require__(238);
 
 	  module.exports = XMLRaw = (function(superClass) {
 	    extend(XMLRaw, superClass);
@@ -32430,7 +39340,7 @@
 
 
 /***/ },
-/* 321 */
+/* 332 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.9.1
@@ -32439,9 +39349,9 @@
 	    extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
 	    hasProp = {}.hasOwnProperty;
 
-	  create = __webpack_require__(224);
+	  create = __webpack_require__(235);
 
-	  XMLNode = __webpack_require__(227);
+	  XMLNode = __webpack_require__(238);
 
 	  module.exports = XMLText = (function(superClass) {
 	    extend(XMLText, superClass);
@@ -32485,7 +39395,7 @@
 
 
 /***/ },
-/* 322 */
+/* 333 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// Generated by CoffeeScript 1.10.0
@@ -32493,7 +39403,7 @@
 	  "use strict";
 	  var xml2js;
 
-	  xml2js = __webpack_require__(166);
+	  xml2js = __webpack_require__(177);
 
 	  exports.stripBOM = function(str) {
 	    if (str[0] === '\uFEFF') {
@@ -32507,7 +39417,7 @@
 
 
 /***/ },
-/* 323 */
+/* 334 */
 /***/ function(module, exports) {
 
 	// Generated by CoffeeScript 1.10.0
@@ -32547,7 +39457,7 @@
 
 
 /***/ },
-/* 324 */
+/* 335 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(setImmediate, clearImmediate) {var nextTick = __webpack_require__(3).nextTick;
@@ -32626,7 +39536,7 @@
 	exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate : function(id) {
 	  delete immediateIds[id];
 	};
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(324).setImmediate, __webpack_require__(324).clearImmediate))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(335).setImmediate, __webpack_require__(335).clearImmediate))
 
 /***/ }
 /******/ ]);
